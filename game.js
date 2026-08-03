@@ -997,23 +997,38 @@
 
   function drawTrack(camPos, groundY, trainScreenX) {
     const railY = groundY + 26;
-    // Schotterbett
-    ctx.fillStyle = "#6b6157";
-    ctx.fillRect(0, railY - 6, W, 26);
+    const yNear = railY + 12;                 // nahe Schiene (vorne/unten)
+    const yFar = yNear + RAIL_DEP * DEP_Y;    // ferne Schiene (hinten/oben)
+    const depX = RAIL_DEP * DEP_X;
 
-    // Schwellen (mit Weltposition, damit sie sich mitbewegen)
-    ctx.fillStyle = "#3d332a";
+    // Schotterbett als schräge Oberfläche
+    ctx.fillStyle = "#7a6f62";
+    ctx.beginPath();
+    ctx.moveTo(0, yNear + 8); ctx.lineTo(W, yNear + 8);
+    ctx.lineTo(W, yFar - 6); ctx.lineTo(0, yFar - 6);
+    ctx.closePath(); ctx.fill();
+    // vordere Böschungskante (etwas dunkler) für Materialstärke
+    ctx.fillStyle = "#5c5348";
+    ctx.fillRect(0, yNear + 8, W, 6);
+
+    // Schwellen als Tiefen-Parallelogramme (mit Weltposition)
     const sleeperSpacing = 12; // Meter
     const startM = Math.floor((camPos - trainScreenX * M_PER_PX) / sleeperSpacing) * sleeperSpacing;
-    for (let m = startM; m < camPos + (W - trainScreenX) * M_PER_PX; m += sleeperSpacing) {
+    const endM = camPos + (W - trainScreenX) * M_PER_PX;
+    ctx.fillStyle = "#3d332a";
+    for (let m = startM; m < endM; m += sleeperSpacing) {
       const x = worldToScreen(m, camPos, trainScreenX);
-      ctx.fillRect(x - 4, railY - 4, 8, 20);
+      ctx.beginPath();
+      ctx.moveTo(x - 4, yNear + 6); ctx.lineTo(x + 4, yNear + 6);
+      ctx.lineTo(x + 4 + depX, yNear + 6 + RAIL_DEP * DEP_Y);
+      ctx.lineTo(x - 4 + depX, yNear + 6 + RAIL_DEP * DEP_Y);
+      ctx.closePath(); ctx.fill();
     }
 
-    // Schienen
-    ctx.fillStyle = "#c9d0d8";
-    ctx.fillRect(0, railY - 2, W, 3);
-    ctx.fillRect(0, railY + 12, W, 3);
+    // Schienen: ferne zuerst (hinten), dann nahe (vorne)
+    ctx.fillStyle = "#aeb6bf"; ctx.fillRect(0, yFar, W, 3);
+    ctx.fillStyle = "#ccd3db"; ctx.fillRect(0, yNear, W, 3);
+    ctx.fillStyle = "rgba(255,255,255,0.35)"; ctx.fillRect(0, yNear, W, 1);
   }
 
   function drawStations(camPos, groundY, trainScreenX) {
@@ -1030,11 +1045,12 @@
     if (cx + halfW < -60 || cx - halfW > W + 60) return;
 
     const platY = groundY + 6;
-    // Bahnsteig
-    ctx.fillStyle = "#b9b2a6";
+    // Bahnsteig: Vorderseite + schräge Deckfläche (2.5D)
+    ctx.fillStyle = "#b0a99d";
     ctx.fillRect(cx - halfW, platY - 18, halfW * 2, 18);
-    ctx.fillStyle = "#d8d2c6";
-    ctx.fillRect(cx - halfW, platY - 18, halfW * 2, 4);
+    topFace(cx - halfW, cx + halfW, platY - 18, RAIL_DEP, "#d3cdc0");
+    ctx.fillStyle = "#e8e2d6";
+    ctx.fillRect(cx - halfW, platY - 18, halfW * 2, 2);
     // Bahnsteigdach (ÖBB-typisch)
     ctx.fillStyle = "rgba(40,55,70,0.85)";
     ctx.fillRect(cx - halfW + 6, platY - 46, halfW * 2 - 12, 5);
@@ -1168,6 +1184,23 @@
   const GREEN_H = 22;  // Höhe des grünen Dachbands
   const WHEEL_R = 9;   // Radradius
 
+  // ---- 2.5D-Schrägprojektion (Kabinettprojektion) ----
+  // Kamera von der Seite und schräg oben: "nach hinten" = auf dem Bildschirm nach oben-rechts.
+  const DEP = 40;              // Tiefe (Breite) des Zugkörpers in Bildpunkten
+  const DEP_X = 0.52;          // Bildschirm-x pro Tiefeneinheit
+  const DEP_Y = -0.52;         // Bildschirm-y pro Tiefeneinheit (negativ = nach oben)
+  const RAIL_DEP = 26;         // Tiefe des Gleises (Abstand nahe/ferne Schiene)
+
+  // Deckfläche (Parallelogramm) von einer Vorderkante nach hinten extrudiert
+  function topFace(x0, x1, y, depth, fill) {
+    const dx = depth * DEP_X, dy = depth * DEP_Y;
+    ctx.fillStyle = fill;
+    ctx.beginPath();
+    ctx.moveTo(x0, y); ctx.lineTo(x1, y);
+    ctx.lineTo(x1 + dx, y + dy); ctx.lineTo(x0 + dx, y + dy);
+    ctx.closePath(); ctx.fill();
+  }
+
   function drawTrain(x, groundY) {
     const railY = groundY + 26;
     const bodyBottom = railY - 6;                    // Kastenunterkante (über den Drehgestellen)
@@ -1207,6 +1240,8 @@
   // Faltenbalg-Übergang zwischen zwei Wagen
   function drawGangway(xL, xR, top, bodyBottom) {
     const y0 = top + 12, y1 = bodyBottom - 3;
+    // Dachbrücke (Schrägfläche), damit die Wagendächer verbunden wirken
+    topFace(xL - 2, xR + 2, top + 3, DEP, "#0b3d2b");
     ctx.fillStyle = "#171b21";
     ctx.fillRect(xL - 3, y0, (xR - xL) + 6, y1 - y0);
     ctx.strokeStyle = "rgba(255,255,255,0.05)"; ctx.lineWidth = 1;
@@ -1311,20 +1346,35 @@
     ctx.fillStyle = "rgba(0,0,0,0.05)"; ctx.fillRect(left - 6, bodyBottom - 7, w + 12, 7); // Schürzenschatten
   }
 
+  // Dach-Oberfläche eines geraden Wagens (Schrägansicht)
+  function drawRoof(left, right, top) {
+    topFace(left + 6, right - 6, top + 1, DEP, "#12684a");
+    // Hinterkante abschatten
+    const dxb = DEP * DEP_X, dyb = DEP * DEP_Y;
+    ctx.fillStyle = "rgba(0,0,0,0.20)";
+    ctx.beginPath();
+    ctx.moveTo(left + 6 + dxb, top + 1 + dyb); ctx.lineTo(right - 6 + dxb, top + 1 + dyb);
+    ctx.lineTo(right - 6 + dxb, top + 4 + dyb); ctx.lineTo(left + 6 + dxb, top + 4 + dyb);
+    ctx.closePath(); ctx.fill();
+    // Klimakästen auf der Dachfläche
+    for (let i = 0; i < 3; i++) {
+      const vu = left + 34 + i * 34, vd = DEP * 0.34;
+      topFace(vu + vd * DEP_X, vu + 18 + vd * DEP_X, top + 1 + vd * DEP_Y, 9, "rgba(210,220,228,0.5)");
+    }
+  }
+
   // Mittelwagen im E5-Design
   function drawMidCar(cx, bodyBottom, railY, spin, hasPanto) {
     const left = cx - CAR_L / 2, right = cx + CAR_L / 2;
     const top = bodyBottom - CAR_H;
     const beltY = top + GREEN_H;
 
-    if (hasPanto) drawPantograph(cx, top, railY);
+    drawRoof(left, right, top);
+    if (hasPanto) drawPantograph(cx + DEP * 0.5 * DEP_X, top + DEP * 0.5 * DEP_Y, railY);
 
     ctx.save();
     roundRect(left, top, CAR_L, CAR_H, 11); ctx.clip();
     fillBodyLivery(left, right, top, beltY, bodyBottom);
-    // Dachlüfter auf dem Grün
-    ctx.fillStyle = "rgba(255,255,255,0.10)";
-    for (let i = 0; i < 3; i++) ctx.fillRect(left + 30 + i * 34, top + 4, 18, 4);
     ctx.restore();
 
     windowStrip(left + 12, right - 12, beltY + 5, 15);
@@ -1342,6 +1392,19 @@
     const beltY = top + GREEN_H;
     const tipX = right + NOSE;
     const tipY = bodyBottom - 11;          // Bugspitze knapp über den Schienen
+
+    // ---- Dach in Schrägansicht (Kasten + verjüngter Bug) ----
+    drawRoof(left, right, top);
+    {
+      const nd = 8; // Resttiefe an der Bugspitze
+      ctx.fillStyle = "#0f6246";
+      ctx.beginPath();
+      ctx.moveTo(right, top);
+      ctx.lineTo(tipX, tipY);
+      ctx.lineTo(tipX + nd * DEP_X, tipY + nd * DEP_Y);
+      ctx.lineTo(right + DEP * DEP_X, top + DEP * DEP_Y);
+      ctx.closePath(); ctx.fill();
+    }
 
     // ---- Umriss: Kasten + langer, flach auslaufender Bug ----
     const outline = () => {
