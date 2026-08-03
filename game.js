@@ -89,7 +89,11 @@
 
   // Kindermodus-Fahrwerte
   const KID_CRUISE = 44;   // flotte, aber ruhige Reisegeschwindigkeit (m/s)
-  const KID_SLOW = 340;    // ab dieser Distanz (m) sanft zum Bahnhof abbremsen
+  const KID_SLOW = 260;    // ab dieser Distanz (m) sanft zum Bahnhof abbremsen
+  // Streckenkompression: nur im Kindermodus die Etappen deutlich verkürzen
+  // (Bahnhöfe + Landmarken werden gemeinsam skaliert; Scroll-Tempo bleibt gleich)
+  const KID_POS_SCALE = 0.1;
+  let posScale = 1;        // 1 = klassisch (reale Abstände), <1 = komprimiert (Kindermodus)
 
   // ---------- Eingabe ----------
   const input = { throttleUp: false, brakeDown: false };
@@ -376,7 +380,8 @@
   function updateKid(dt) {
     if (game.stationIdx < STATIONS.length) {
       const st = STATIONS[game.stationIdx];
-      const dist = st.pos - game.pos;
+      const target = st.pos * posScale;
+      const dist = target - game.pos;
       if (game.going) {
         // Wunschgeschwindigkeit: cruisen, nahe am Bahnhof sanft bis auf Kriechtempo
         // (Wurzel-Kennlinie: bleibt länger zügig, bremst dann weich ein)
@@ -386,7 +391,7 @@
         game.pos += game.vel * dt;
         // Am Bahnhof angekommen -> sanft andocken und jubeln
         if (dist <= 5) {
-          game.pos = st.pos; game.vel = 0; game.going = false;
+          game.pos = target; game.vel = 0; game.going = false;
           arriveKid(st);
         }
       } else {
@@ -619,7 +624,7 @@
   // Weltverankerte Berg-Landmarken: Untersberg (Massiv) & Gaisberg (Sendeturm)
   function drawFarLandmarks(camPos, groundY, trainScreenX) {
     const par = 0.13;
-    const sx = (wp) => trainScreenX + (wp - camPos) / M_PER_PX * par;
+    const sx = (wp) => trainScreenX + (wp * posScale - camPos) / M_PER_PX * par;
     const uX = sx(14300);
     if (uX > -520 && uX < W + 520) drawUntersberg(uX, groundY);
     const gX = sx(12400);
@@ -745,7 +750,7 @@
   // Streckenspezifische Landmarken: Wallersee (Start) & Salzburg-Skyline (Ziel)
   function drawLandmarks(camPos, groundY, trainScreenX) {
     const par = 0.42;
-    const sx = (wp) => trainScreenX + (wp - camPos) / M_PER_PX * par;
+    const sx = (wp) => trainScreenX + (wp * posScale - camPos) / M_PER_PX * par;
 
     const lakeX = sx(600);
     if (lakeX > -380 && lakeX < W + 380) drawWallersee(lakeX, groundY);
@@ -1040,7 +1045,7 @@
   }
 
   function drawPlatform(st, isNext, isOrigin, camPos, groundY, trainScreenX) {
-    const cx = worldToScreen(st.pos, camPos, trainScreenX);
+    const cx = worldToScreen(st.pos * posScale, camPos, trainScreenX);
     const halfW = (PLATFORM_LEN / 2) / M_PER_PX;
     if (cx + halfW < -60 || cx - halfW > W + 60) return;
 
@@ -1098,7 +1103,7 @@
 
   function drawSignals(camPos, groundY, trainScreenX) {
     for (const sig of SIGNALS) {
-      const x = worldToScreen(sig.pos, camPos, trainScreenX);
+      const x = worldToScreen(sig.pos * posScale, camPos, trainScreenX);
       if (x < -30 || x > W + 30) continue;
       const baseY = groundY + 8;
       // Mast
@@ -1678,6 +1683,8 @@
       statusMsg: kid ? "" : `Abfahrt ${ORIGIN.name} → ${STATIONS[0].name}`,
     });
     game.penalizedSignals = new Set();
+    // Im Kindermodus Etappen komprimieren (kürzere Zeit zwischen Bahnhöfen)
+    posScale = kid ? KID_POS_SCALE : 1;
     // Im Kindermodus alle Signale freundlich auf Grün
     if (kid) SIGNALS.forEach((s) => (s.state = "green"));
     document.body.classList.toggle("kid", kid);
