@@ -37,6 +37,28 @@ Die Setup-Dateien im Repo:
 Für den Betrieb hinter einer eigenen Domain mit automatischem HTTPS eignet sich
 ein Reverse Proxy wie Caddy oder Traefik vor dem Container.
 
+### Proxmox: LXC-Container automatisch anlegen
+
+Auf dem **Proxmox-VE-Host** (als root) legt dieses Skript einen fertigen
+unprivilegierten LXC-Container an, installiert nginx und hostet das Spiel:
+
+```bash
+# aus dem Repo-Ordner heraus ausführen (nimmt die lokalen Spieldateien)
+./deploy-proxmox-lxc.sh
+```
+
+Alles ist per Umgebungsvariable einstellbar, z. B.:
+
+```bash
+CTID=150 HOSTNAME=zug DISK_STORAGE=local-lvm IPCONF=192.168.1.50/24 \
+  GATEWAY=192.168.1.1 ./deploy-proxmox-lxc.sh
+```
+
+Wichtige Variablen: `CTID` (Standard: nächste freie ID), `HOSTNAME`,
+`DISK_STORAGE` (auto), `BRIDGE` (`vmbr0`), `IPCONF` (`dhcp` oder feste IP/CIDR),
+`GATEWAY`, `CORES`, `RAM_MB`, `DISK_GB`, `HTTP_PORT`, `REPO_URL`. Am Ende zeigt
+das Skript die URL, das Root-Passwort und die passenden `pct`-Befehle an.
+
 ## Strecke
 
 Abfahrt in **Seekirchen am Wallersee**, dann in dieser Reihenfolge halten
