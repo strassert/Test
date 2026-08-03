@@ -59,6 +59,18 @@ Wichtige Variablen: `CTID` (Standard: nächste freie ID), `HOSTNAME`,
 `GATEWAY`, `CORES`, `RAM_MB`, `DISK_GB`, `HTTP_PORT`, `REPO_URL`. Am Ende zeigt
 das Skript die URL, das Root-Passwort und die passenden `pct`-Befehle an.
 
+### Updates einspielen
+
+Weil es statische Dateien sind, genügt Überschreiben – kein nginx-Neustart nötig
+(im Browser danach `Strg`+`F5`). Auf dem Proxmox-Host:
+
+```bash
+./update-lxc.sh <CTID>      # z. B. ./update-lxc.sh 108
+```
+
+Das Skript überträgt lokale Dateien per `pct push`; fehlen sie, lädt es sie vom
+GitHub-Branch. Quelle wählbar über `BRANCH=main ./update-lxc.sh <CTID>`.
+
 ## Strecke
 
 Abfahrt in **Seekirchen am Wallersee**, dann in dieser Reihenfolge halten
