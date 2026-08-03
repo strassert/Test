@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Zugsimulator — Browser Train Simulator</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="game-wrapper">
+    <canvas id="game"></canvas>
+
+    <!-- HUD -->
+    <div id="hud">
+      <div class="hud-panel" id="speed-panel">
+        <div class="hud-label">Geschwindigkeit</div>
+        <div class="hud-value"><span id="speed">0</span> <span class="unit">km/h</span></div>
+        <div class="hud-limit">Limit: <span id="limit">100</span> km/h</div>
+      </div>
+
+      <div class="hud-panel" id="lever-panel">
+        <div class="lever">
+          <div class="lever-label">Schub</div>
+          <div class="lever-track"><div class="lever-fill throttle" id="throttle-fill"></div></div>
+          <div class="lever-num" id="throttle-num">0%</div>
+        </div>
+        <div class="lever">
+          <div class="lever-label">Bremse</div>
+          <div class="lever-track"><div class="lever-fill brake" id="brake-fill"></div></div>
+          <div class="lever-num" id="brake-num">0%</div>
+        </div>
+      </div>
+
+      <div class="hud-panel" id="info-panel">
+        <div class="info-row"><span>Nächster Halt</span><b id="next-station">—</b></div>
+        <div class="info-row"><span>Entfernung</span><b id="next-dist">—</b></div>
+        <div class="info-row"><span>Signal</span><b id="signal-state" class="sig-green">frei</b></div>
+        <div class="info-row"><span>Strecke</span><b><span id="odometer">0.0</span> km</b></div>
+      </div>
+
+      <div class="hud-panel" id="score-panel">
+        <div class="hud-label">Punkte</div>
+        <div class="hud-value" id="score">0</div>
+        <div class="hud-limit" id="status-msg">Bereit zur Abfahrt</div>
+      </div>
+    </div>
+
+    <!-- Controls hint -->
+    <div id="controls-hint">
+      <span><kbd>W</kbd>/<kbd>↑</kbd> Schub</span>
+      <span><kbd>S</kbd>/<kbd>↓</kbd> Bremse</span>
+      <span><kbd>Leertaste</kbd> Notbremse</span>
+      <span><kbd>H</kbd> Hupe</span>
+      <span><kbd>P</kbd> Pause</span>
+    </div>
+
+    <!-- Start / message overlay -->
+    <div id="overlay">
+      <div class="overlay-box">
+        <h1>🚂 Zugsimulator</h1>
+        <p class="tagline">Fahre deinen Zug pünktlich und sicher von Bahnhof zu Bahnhof.</p>
+        <ul class="rules">
+          <li>🎚️ Regle <b>Schub</b> und <b>Bremse</b> mit den Pfeiltasten oder <b>W/S</b>.</li>
+          <li>🛑 Halte <b>präzise am Bahnsteig</b> — je genauer, desto mehr Punkte.</li>
+          <li>🚦 Beachte <b>rote Signale</b> — durchfahren kostet Punkte!</li>
+          <li>⚡ Überschreite das <b>Tempolimit</b> nicht.</li>
+          <li>🎯 Fahre die ganze Strecke ab und sammle Punkte.</li>
+        </ul>
+        <button id="start-btn">Fahrt beginnen</button>
+        <p class="hint-small">Touch-Geräte: nutze die Tasten unten am Bildschirm.</p>
+      </div>
+    </div>
+
+    <!-- Touch controls -->
+    <div id="touch-controls">
+      <button class="touch-btn" data-key="brake">▼ Bremse</button>
+      <button class="touch-btn" data-key="horn">📢</button>
+      <button class="touch-btn" data-key="throttle">▲ Schub</button>
+    </div>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
