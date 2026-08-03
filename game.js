@@ -703,254 +703,306 @@
     }
   }
 
-  // Shinkansen-E5-Farben ("Hayabusa")
-  const SK_GREEN_TOP = "#12653f";
-  const SK_GREEN_BOT = "#0c4a30";
-  const SK_WHITE_TOP = "#f3f6f9";
-  const SK_WHITE_BOT = "#d5dde3";
+  // ===== Shinkansen E5 „Hayabusa" =====
+  const SK_GREEN_TOP = "#14684a";
+  const SK_GREEN_BOT = "#083c28";
+  const SK_WHITE_TOP = "#f6f9fb";
+  const SK_WHITE_BOT = "#dbe2e8";
   const SK_PINK = "#e5006e";
-  const SK_WIN = "#0c1a24";
+  const SK_WIN = "#0b1922";
+
+  const CAR_L = 150;   // Länge des geraden Wagenkastens (px)
+  const CAR_H = 58;    // Höhe des Wagenkastens
+  const GAP = 12;      // Lücke (Übergang) zwischen benachbarten Wagen
+  const NOSE = 104;    // Länge des Bugs über den Kasten hinaus
+  const GREEN_H = 22;  // Höhe des grünen Dachbands
+  const WHEEL_R = 9;   // Radradius
 
   function drawTrain(x, groundY) {
     const railY = groundY + 26;
-    const bodyBottom = railY - 4;
+    const bodyBottom = railY - 6;                    // Kastenunterkante (über den Drehgestellen)
     // Räder rollen vorwärts (nach rechts) => im Uhrzeigersinn => positive Rotation
-    const spin = game.pos / (11 * M_PER_PX);
+    const spin = game.pos / (WHEEL_R * M_PER_PX);
 
     ctx.save();
-    // leichtes Wippen bei Geschwindigkeit
-    const bob = Math.sin(game.time * 9) * Math.min(game.vel * 0.03, 0.9);
+    const bob = Math.sin(game.time * 9) * Math.min(game.vel * 0.03, 0.8);
     ctx.translate(0, bob);
 
+    // Einheitliche Wagenmittelpunkte: Triebkopf bei x, Wagen im festen Raster
+    const leadC = x;
+    const c1 = x - (CAR_L + GAP);
+    const c2 = x - 2 * (CAR_L + GAP);
+    const top = bodyBottom - CAR_H;
+    const noseTip = leadC + CAR_L / 2 + NOSE;
+    const tailX = c2 - CAR_L / 2;
+
     // Gemeinsamer Schatten unter dem ganzen Zug
-    ctx.fillStyle = "rgba(0,0,0,0.28)";
+    ctx.fillStyle = "rgba(0,0,0,0.26)";
     ctx.beginPath();
-    ctx.ellipse(x - 150, bodyBottom + 8, 400, 9, 0, 0, Math.PI * 2);
+    ctx.ellipse((noseTip + tailX) / 2, railY + 11, (noseTip - tailX) / 2 + 8, 7, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Angehängte Wagen (hinter dem Triebkopf, also links); mittlerer trägt Pantograph
-    drawCar(x - 372, groundY, bodyBottom, spin, false);
-    drawCar(x - 210, groundY, bodyBottom, spin, true);
-    // Übergänge/Kupplungen
-    ctx.fillStyle = "#1a1e24";
-    ctx.fillRect(x - 108, bodyBottom - 30, 14, 24);
-    ctx.fillRect(x - 285, bodyBottom - 30, 12, 24);
+    // Wagenübergänge (Faltenbälge) in den Lücken – zuerst, damit Kästen sie überdecken
+    drawGangway(c2 + CAR_L / 2, c1 - CAR_L / 2, top, bodyBottom);
+    drawGangway(c1 + CAR_L / 2, leadC - CAR_L / 2, top, bodyBottom);
 
-    // Triebkopf (Front mit langem Bug zeigt nach rechts)
-    drawLead(x, groundY, bodyBottom, spin);
+    // Wagen von hinten nach vorne (Triebkopf zuletzt = ganz vorn)
+    drawMidCar(c2, bodyBottom, railY, spin, false);
+    drawMidCar(c1, bodyBottom, railY, spin, true);   // dieser Wagen trägt den Pantograph
+    drawLeadCar(leadC, bodyBottom, railY, spin);
 
     ctx.restore();
   }
 
-  // Drehgestell mit zwei Achsen
-  function drawBogie(cx, bottom, spin) {
-    const r = 11;
-    // Rahmen
-    ctx.fillStyle = "#20252c";
-    roundRect(cx - 34, bottom - 20, 68, 16, 4);
-    ctx.fill();
-    for (const dx of [-20, 20]) {
+  // Faltenbalg-Übergang zwischen zwei Wagen
+  function drawGangway(xL, xR, top, bodyBottom) {
+    const y0 = top + 12, y1 = bodyBottom - 3;
+    ctx.fillStyle = "#171b21";
+    ctx.fillRect(xL - 3, y0, (xR - xL) + 6, y1 - y0);
+    ctx.strokeStyle = "rgba(255,255,255,0.05)"; ctx.lineWidth = 1;
+    for (let gx = xL; gx <= xR; gx += 3) {
+      ctx.beginPath(); ctx.moveTo(gx, y0 + 2); ctx.lineTo(gx, y1 - 2); ctx.stroke();
+    }
+  }
+
+  // Ein Drehgestell mit zwei Rädern, korrekt auf der Schiene sitzend
+  function drawBogie(cx, bodyBottom, railY, spin) {
+    const r = WHEEL_R;
+    const cy = railY + 3;                 // Achsmitte: Radunterkante ~ Schiene
+    // Drehgestellrahmen / Schürze (verbindet Kasten und Achsen)
+    ctx.fillStyle = "#181c22";
+    roundRect(cx - 29, bodyBottom - 1, 58, cy - bodyBottom + 1, 4); ctx.fill();
+    ctx.fillStyle = "#252b33";
+    ctx.fillRect(cx - 24, bodyBottom + 1, 48, 3);
+    for (const dx of [-17, 17]) {
       ctx.save();
-      ctx.translate(cx + dx, bottom);
+      ctx.translate(cx + dx, cy);
       // Reifen
-      ctx.fillStyle = "#15181d";
+      ctx.fillStyle = "#0f1216";
       ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
-      // Felge
-      ctx.fillStyle = "#4b535e";
-      ctx.beginPath(); ctx.arc(0, 0, r - 4, 0, Math.PI * 2); ctx.fill();
-      // Speichen (drehen sich)
+      // Radscheibe (Stahl)
+      ctx.fillStyle = "#5a636f";
+      ctx.beginPath(); ctx.arc(0, 0, r - 2.4, 0, Math.PI * 2); ctx.fill();
+      // Speichen (drehen sich mit)
       ctx.rotate(spin);
-      ctx.strokeStyle = "#20252c"; ctx.lineWidth = 2;
-      for (let s = 0; s < 4; s++) {
+      ctx.strokeStyle = "#1f252c"; ctx.lineWidth = 1.6;
+      for (let s = 0; s < 6; s++) {
+        const a = s * Math.PI / 3;
         ctx.beginPath(); ctx.moveTo(0, 0);
-        ctx.lineTo(Math.cos(s * Math.PI / 2) * (r - 4), Math.sin(s * Math.PI / 2) * (r - 4));
+        ctx.lineTo(Math.cos(a) * (r - 2.4), Math.sin(a) * (r - 2.4));
         ctx.stroke();
       }
       // Nabe
-      ctx.fillStyle = "#cbd3dd";
-      ctx.beginPath(); ctx.arc(0, 0, 2.5, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#d0d8e2";
+      ctx.beginPath(); ctx.arc(0, 0, 2.1, 0, Math.PI * 2); ctx.fill();
       ctx.restore();
     }
   }
 
-  // Stromabnehmer (Einholm-Pantograph), berührt den Fahrdraht
-  function drawPantograph(panX, roofY, wireY) {
-    ctx.strokeStyle = "#2b333d"; ctx.lineWidth = 2.4; ctx.lineCap = "round";
-    ctx.fillStyle = "#3a424c";
-    ctx.fillRect(panX - 16, roofY - 3, 32, 4);           // Sockel
+  // Einholm-Pantograph, berührt den Fahrdraht der Oberleitung
+  function drawPantograph(cx, roofY, railY) {
+    const wireY = (railY - 26) - WIRE_H;   // groundY = railY - 26
+    // Dachisolatoren
+    ctx.fillStyle = "#9aa3ac";
+    ctx.fillRect(cx - 18, roofY - 4, 5, 5);
+    ctx.fillRect(cx + 13, roofY - 4, 5, 5);
+    ctx.fillStyle = "#2b333d";
+    ctx.fillRect(cx - 20, roofY - 1, 40, 3);       // Grundrahmen
+    // Einholmarm
+    ctx.strokeStyle = "#2b333d"; ctx.lineWidth = 2.6; ctx.lineCap = "round"; ctx.lineJoin = "round";
     ctx.beginPath();
-    ctx.moveTo(panX - 12, roofY - 1); ctx.lineTo(panX + 6, wireY + 5);   // Unterarm
-    ctx.moveTo(panX + 6, wireY + 5);  ctx.lineTo(panX - 10, wireY + 2);  // Oberarm
+    ctx.moveTo(cx - 13, roofY - 1);
+    ctx.lineTo(cx + 7, wireY + 8);
+    ctx.lineTo(cx - 8, wireY + 4);
     ctx.stroke();
-    ctx.strokeStyle = "#1a1e24"; ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.moveTo(panX - 20, wireY + 2); ctx.lineTo(panX + 14, wireY + 2); ctx.stroke(); // Schleifleiste
+    // Schleifleiste (Kontakt zum Draht)
+    ctx.strokeStyle = "#12161b"; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(cx - 22, wireY + 3); ctx.lineTo(cx + 16, wireY + 3); ctx.stroke();
     ctx.lineWidth = 1;
   }
 
-  // Fensterband (durchgehend, getönt) mit Glanzsegmenten
-  function windowBand(x0, x1, y, h) {
+  // Getöntes Fensterband mit einzelnen Scheiben und Reflex
+  function windowStrip(x0, x1, y, h) {
     ctx.fillStyle = SK_WIN;
-    roundRect(x0, y, x1 - x0, h, h / 2); ctx.fill();
-    ctx.fillStyle = "rgba(150,200,235,0.28)";
-    const n = Math.floor((x1 - x0) / 22);
-    for (let i = 0; i < n; i++) roundRect(x0 + 6 + i * 22, y + 2, 13, h - 4, 2), ctx.fill();
+    roundRect(x0, y, x1 - x0, h, 3); ctx.fill();
+    const paneW = 19, gap = 6;
+    for (let px = x0 + 6; px + paneW <= x1 - 3; px += paneW + gap) {
+      const rg = ctx.createLinearGradient(0, y, 0, y + h);
+      rg.addColorStop(0, "rgba(160,208,240,0.6)");
+      rg.addColorStop(1, "rgba(70,120,158,0.4)");
+      ctx.fillStyle = rg;
+      roundRect(px, y + 2, paneW, h - 4, 2); ctx.fill();
+      ctx.fillStyle = "rgba(255,255,255,0.22)";
+      ctx.fillRect(px + 2, y + 3, 4, h - 6);
+    }
   }
 
-  // Triebkopf mit langem "Hayabusa"-Bug (Front nach rechts)
-  function drawLead(cx, groundY, bodyBottom, spin) {
-    const height = 62;
-    const top = bodyBottom - height;
-    const beltY = top + 30;                 // Übergang Grün/Weiß (pinke Linie)
-    const bodyLeft = cx - 74;
-    const bodyRight = cx + 44;               // Bug/Körper-Übergang
-    const tipX = cx + 132, tipY = bodyBottom - 15;
+  function drawDoors(left, right, beltY, bodyBottom) {
+    ctx.strokeStyle = "rgba(120,140,155,0.55)"; ctx.lineWidth = 1;
+    for (const dx of [30, (right - left) - 42]) {
+      const x = left + dx;
+      for (const ox of [0, 13]) {
+        ctx.beginPath(); ctx.moveTo(x + ox, beltY + 5); ctx.lineTo(x + ox, bodyBottom - 6); ctx.stroke();
+      }
+    }
+  }
 
-    // ---- Körper-Umriss (Körper + langer Bug) ----
-    ctx.beginPath();
-    ctx.moveTo(bodyLeft + 8, top);
-    ctx.lineTo(bodyRight, top);
-    ctx.quadraticCurveTo(bodyRight + 76, top + 3, tipX, tipY);        // Bugrücken
-    ctx.quadraticCurveTo(bodyRight + 58, bodyBottom + 1, bodyRight, bodyBottom); // Bugunterseite
-    ctx.lineTo(bodyLeft + 6, bodyBottom);
-    ctx.quadraticCurveTo(bodyLeft, bodyBottom, bodyLeft, bodyBottom - 8);
-    ctx.lineTo(bodyLeft, top + 8);
-    ctx.quadraticCurveTo(bodyLeft, top, bodyLeft + 8, top);
-    ctx.closePath();
+  // Gemeinsame Lackierung des geraden Kastenteils
+  function fillBodyLivery(left, right, top, beltY, bodyBottom) {
+    const w = right - left;
+    const wg = ctx.createLinearGradient(0, top, 0, bodyBottom);
+    wg.addColorStop(0, SK_WHITE_TOP); wg.addColorStop(1, SK_WHITE_BOT);
+    ctx.fillStyle = wg; ctx.fillRect(left - 6, top - 6, w + 12, CAR_H + 12);
+    const gg = ctx.createLinearGradient(0, top, 0, beltY);
+    gg.addColorStop(0, SK_GREEN_TOP); gg.addColorStop(1, SK_GREEN_BOT);
+    ctx.fillStyle = gg; ctx.fillRect(left - 6, top - 6, w + 12, (beltY - top) + 6);
+    ctx.fillStyle = SK_PINK; ctx.fillRect(left - 6, beltY, w + 12, 3);           // Signaturlinie
+    ctx.fillStyle = "rgba(255,255,255,0.16)"; ctx.fillRect(left + 5, top + 3, w - 10, 3); // Dachglanz
+    ctx.fillStyle = "rgba(0,0,0,0.05)"; ctx.fillRect(left - 6, bodyBottom - 7, w + 12, 7); // Schürzenschatten
+  }
+
+  // Mittelwagen im E5-Design
+  function drawMidCar(cx, bodyBottom, railY, spin, hasPanto) {
+    const left = cx - CAR_L / 2, right = cx + CAR_L / 2;
+    const top = bodyBottom - CAR_H;
+    const beltY = top + GREEN_H;
+
+    if (hasPanto) drawPantograph(cx, top, railY);
 
     ctx.save();
-    ctx.clip();
+    roundRect(left, top, CAR_L, CAR_H, 11); ctx.clip();
+    fillBodyLivery(left, right, top, beltY, bodyBottom);
+    // Dachlüfter auf dem Grün
+    ctx.fillStyle = "rgba(255,255,255,0.10)";
+    for (let i = 0; i < 3; i++) ctx.fillRect(left + 30 + i * 34, top + 4, 18, 4);
+    ctx.restore();
+
+    windowStrip(left + 12, right - 12, beltY + 5, 15);
+    drawDoors(left, right, beltY, bodyBottom);
+
+    drawBogie(left + 30, bodyBottom, railY, spin);
+    drawBogie(right - 30, bodyBottom, railY, spin);
+  }
+
+  // Triebkopf mit langem „Hayabusa"-Bug (Front nach rechts)
+  function drawLeadCar(cx, bodyBottom, railY, spin) {
+    const left = cx - CAR_L / 2;
+    const right = cx + CAR_L / 2;          // Übergang Kasten -> Bug
+    const top = bodyBottom - CAR_H;
+    const beltY = top + GREEN_H;
+    const tipX = right + NOSE;
+    const tipY = bodyBottom - 11;          // Bugspitze knapp über den Schienen
+
+    // ---- Umriss: Kasten + langer, flach auslaufender Bug ----
+    const outline = () => {
+      ctx.beginPath();
+      ctx.moveTo(left + 10, top);
+      ctx.lineTo(right, top);
+      ctx.bezierCurveTo(right + NOSE * 0.55, top + 2, tipX - 8, tipY - 22, tipX, tipY);
+      ctx.quadraticCurveTo(right + NOSE * 0.5, bodyBottom + 2, right, bodyBottom);
+      ctx.lineTo(left + 8, bodyBottom);
+      ctx.quadraticCurveTo(left, bodyBottom, left, bodyBottom - 8);
+      ctx.lineTo(left, top + 8);
+      ctx.quadraticCurveTo(left, top, left + 10, top);
+      ctx.closePath();
+    };
+
+    ctx.save();
+    outline(); ctx.clip();
     // Weiß (Basis)
     const wg = ctx.createLinearGradient(0, top, 0, bodyBottom);
     wg.addColorStop(0, SK_WHITE_TOP); wg.addColorStop(1, SK_WHITE_BOT);
-    ctx.fillStyle = wg;
-    ctx.fillRect(bodyLeft - 4, top - 4, tipX - bodyLeft + 12, height + 8);
-    // Grün (Dach + über den Bug laufend)
-    const gg = ctx.createLinearGradient(0, top, 0, beltY);
+    ctx.fillStyle = wg; ctx.fillRect(left - 6, top - 6, tipX - left + 14, CAR_H + 14);
+    // Grün: Dach + über den gesamten Bugrücken bis zur Spitze
+    const gg = ctx.createLinearGradient(0, top, 0, beltY + 12);
     gg.addColorStop(0, SK_GREEN_TOP); gg.addColorStop(1, SK_GREEN_BOT);
     ctx.fillStyle = gg;
     ctx.beginPath();
-    ctx.moveTo(bodyLeft - 4, top - 4);
-    ctx.lineTo(bodyRight, top);
-    ctx.quadraticCurveTo(bodyRight + 76, top + 3, tipX, tipY);
-    ctx.quadraticCurveTo(bodyRight + 40, tipY + 9, bodyRight, beltY);
-    ctx.lineTo(bodyLeft - 4, beltY);
-    ctx.closePath();
-    ctx.fill();
-    // Pinke Signaturlinie entlang Gürtellinie und Bug
-    ctx.strokeStyle = SK_PINK; ctx.lineWidth = 3.2; ctx.lineCap = "round";
+    ctx.moveTo(left - 6, top - 6);
+    ctx.lineTo(right, top);
+    ctx.bezierCurveTo(right + NOSE * 0.55, top + 2, tipX - 8, tipY - 22, tipX, tipY);
+    ctx.quadraticCurveTo(right + NOSE * 0.4, tipY - 3, right, beltY);
+    ctx.lineTo(left - 6, beltY);
+    ctx.closePath(); ctx.fill();
+    // Pinke Signaturlinie entlang Gürtel und Bug
+    ctx.strokeStyle = SK_PINK; ctx.lineWidth = 3; ctx.lineCap = "round";
     ctx.beginPath();
-    ctx.moveTo(bodyLeft, beltY + 1.5);
-    ctx.lineTo(bodyRight, beltY + 1.5);
-    ctx.quadraticCurveTo(bodyRight + 42, tipY + 11, tipX - 6, tipY + 5);
+    ctx.moveTo(left, beltY + 1.5);
+    ctx.lineTo(right, beltY + 1.5);
+    ctx.quadraticCurveTo(right + NOSE * 0.42, tipY + 1, tipX - 9, tipY + 3);
     ctx.stroke();
-    // Glanz auf dem Dach
-    ctx.strokeStyle = "rgba(255,255,255,0.22)"; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(bodyLeft + 8, top + 5); ctx.lineTo(bodyRight + 4, top + 6); ctx.stroke();
+    // Dachglanz
+    ctx.fillStyle = "rgba(255,255,255,0.16)"; ctx.fillRect(left + 6, top + 3, CAR_L - 22, 3);
+    // Bug-Glanz (Sheen entlang des Bugrückens) für den lackierten Hochglanz-Look
+    ctx.strokeStyle = "rgba(255,255,255,0.20)"; ctx.lineWidth = 3; ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(right + 4, top + 6);
+    ctx.quadraticCurveTo(right + NOSE * 0.6, top + 2, tipX - 16, tipY - 13);
+    ctx.stroke();
     ctx.restore();
 
-    // ---- Fensterband (weißer Bereich) ----
-    windowBand(bodyLeft + 12, bodyRight - 4, beltY + 6, 15);
-
-    // ---- Frontscheibe (Fahrerstand, schräg an der Bugwurzel) ----
+    // ---- Cockpit-Frontscheibe (schwarz, umlaufend) an der Bugwurzel ----
     ctx.fillStyle = SK_WIN;
     ctx.beginPath();
-    ctx.moveTo(bodyRight - 6, top + 9);
-    ctx.quadraticCurveTo(bodyRight + 24, top + 11, bodyRight + 30, beltY - 2);
-    ctx.lineTo(bodyRight + 8, beltY - 1);
-    ctx.lineTo(bodyRight - 6, top + 24);
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillStyle = "rgba(170,215,250,0.5)";
+    ctx.moveTo(right - 6, top + 8);
+    ctx.quadraticCurveTo(right + 28, top + 10, right + 42, beltY - 2);
+    ctx.lineTo(right + 20, beltY + 7);
+    ctx.lineTo(right - 6, top + 26);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "rgba(165,212,247,0.45)";
     ctx.beginPath();
-    ctx.moveTo(bodyRight - 2, top + 12);
-    ctx.lineTo(bodyRight + 14, top + 14);
-    ctx.lineTo(bodyRight + 4, beltY - 3);
-    ctx.closePath();
-    ctx.fill();
+    ctx.moveTo(right - 2, top + 12); ctx.lineTo(right + 16, top + 14);
+    ctx.lineTo(right + 5, beltY); ctx.closePath(); ctx.fill();
 
-    // ---- Scheinwerfer am Bug + Lichtkegel ----
-    ctx.fillStyle = "#eaf6ff";
-    ctx.beginPath(); ctx.ellipse(bodyRight + 60, tipY - 4, 5, 3, -0.2, 0, Math.PI * 2); ctx.fill();
+    // ---- Seitenfenster ----
+    windowStrip(left + 12, right - 8, beltY + 5, 15);
+    drawDoors(left, right, beltY, bodyBottom);
+
+    // ---- Scheinwerfer (zwei) am Bug + Lichtkegel ----
+    const hlx = right + NOSE * 0.52, hly = tipY - 7;
+    ctx.fillStyle = "#f4faff";
+    ctx.beginPath(); ctx.ellipse(hlx, hly, 4.5, 3, -0.15, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(hlx + 11, hly + 4, 3.4, 2.3, -0.15, 0, Math.PI * 2); ctx.fill();
     if (game.vel > 0.5) {
-      const glow = Math.min(0.22, 0.07 + game.vel * 0.003);
-      ctx.fillStyle = `rgba(235,246,255,${glow})`;
+      const glow = Math.min(0.22, 0.06 + game.vel * 0.003);
+      ctx.fillStyle = `rgba(240,248,255,${glow})`;
       ctx.beginPath();
-      ctx.moveTo(bodyRight + 62, tipY - 6);
-      ctx.lineTo(tipX + 70, tipY - 26);
-      ctx.lineTo(tipX + 70, tipY + 12);
-      ctx.closePath();
-      ctx.fill();
+      ctx.moveTo(hlx + 4, hly - 4);
+      ctx.lineTo(tipX + 82, tipY - 30);
+      ctx.lineTo(tipX + 82, tipY + 14);
+      ctx.closePath(); ctx.fill();
     }
-    // Baureihen-Kennung
-    ctx.fillStyle = SK_PINK;
-    ctx.font = "bold 9px system-ui, sans-serif";
+    // Kupplungsklappe an der Spitze
+    ctx.fillStyle = "rgba(0,0,0,0.16)";
+    ctx.beginPath(); ctx.ellipse(tipX - 5, tipY + 1, 4, 6, 0, 0, Math.PI * 2); ctx.fill();
+
+    // ---- Kennung ----
     ctx.textAlign = "left";
-    ctx.fillText("E5", bodyLeft + 10, beltY - 6);
+    ctx.fillStyle = SK_PINK; ctx.font = "bold 11px system-ui, sans-serif";
+    ctx.fillText("E5", left + 12, beltY - 6);
+    ctx.fillStyle = "rgba(20,30,40,0.7)"; ctx.font = "italic bold 8px system-ui, sans-serif";
+    ctx.fillText("HAYABUSA", left + 30, beltY - 7);
 
-    // Drehgestelle
-    drawBogie(bodyLeft + 26, bodyBottom + 4, spin);
-    drawBogie(bodyRight - 6, bodyBottom + 4, spin);
+    // ---- Drehgestelle (unter dem Kasten, nicht unter dem Bug) ----
+    drawBogie(left + 30, bodyBottom, railY, spin);
+    drawBogie(right - 34, bodyBottom, railY, spin);
 
-    // Bremsfunken
+    // ---- Effekte ----
     if ((game.brake > 0.6 || game.emergency) && game.vel > 4) {
       for (let i = 0; i < 5; i++) {
         ctx.fillStyle = `rgba(255,${180 + Math.random() * 60 | 0},80,${Math.random()})`;
-        const sx = bodyLeft + 20 + Math.random() * 40;
-        ctx.fillRect(sx, bodyBottom + 8 + Math.random() * 8, 2, 2);
+        const sx = left + 20 + Math.random() * (CAR_L - 50);
+        ctx.fillRect(sx, railY + Math.random() * 5, 2, 2);
       }
     }
-    // Signalhorn-Effekt
     if (game.horn > 0) {
       ctx.fillStyle = `rgba(255,255,255,${game.horn})`;
       for (let i = 0; i < 5; i++) {
         ctx.beginPath();
-        ctx.arc(tipX + 6 + i * 12, tipY - 8 - i * 5, 4 + i, 0, Math.PI * 2);
+        ctx.arc(tipX + 6 + i * 12, tipY - 10 - i * 5, 4 + i, 0, Math.PI * 2);
         ctx.fill();
       }
     }
-  }
-
-  // Mittel-/Endwagen im E5-Design
-  function drawCar(cx, groundY, bodyBottom, spin, pantograph) {
-    const len = 150, height = 62;
-    const left = cx - len / 2;
-    const top = bodyBottom - height;
-    const beltY = top + 30;
-
-    if (pantograph) drawPantograph(cx, top - 1, groundY - WIRE_H);
-
-    // Körper (weiße Basis, gerundetes Dach)
-    ctx.save();
-    roundRect(left, top, len, height, 13);
-    ctx.clip();
-    const wg = ctx.createLinearGradient(0, top, 0, bodyBottom);
-    wg.addColorStop(0, SK_WHITE_TOP); wg.addColorStop(1, SK_WHITE_BOT);
-    ctx.fillStyle = wg;
-    ctx.fillRect(left, top, len, height);
-    // Grünes Dach bis zur Gürtellinie
-    const gg = ctx.createLinearGradient(0, top, 0, beltY);
-    gg.addColorStop(0, SK_GREEN_TOP); gg.addColorStop(1, SK_GREEN_BOT);
-    ctx.fillStyle = gg;
-    ctx.fillRect(left, top, len, beltY - top);
-    // Pinke Signaturlinie
-    ctx.fillStyle = SK_PINK;
-    ctx.fillRect(left, beltY, len, 3);
-    // Dachglanz
-    ctx.fillStyle = "rgba(255,255,255,0.18)";
-    ctx.fillRect(left + 6, top + 4, len - 12, 3);
-    ctx.restore();
-
-    // Fensterband
-    windowBand(left + 10, left + len - 10, beltY + 6, 15);
-    // Türen (weiß, schmale Fugen)
-    ctx.strokeStyle = "rgba(120,140,155,0.7)"; ctx.lineWidth = 1;
-    for (const dx of [24, len - 24]) {
-      ctx.beginPath(); ctx.moveTo(left + dx, beltY + 4); ctx.lineTo(left + dx, bodyBottom - 6); ctx.stroke();
-    }
-
-    // Drehgestelle
-    drawBogie(left + 28, bodyBottom + 4, spin);
-    drawBogie(left + len - 28, bodyBottom + 4, spin);
   }
 
   function drawPauseOverlay() {
