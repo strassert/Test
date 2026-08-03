@@ -1426,15 +1426,26 @@
     // ---- Dach in Schrägansicht: Kasten + Bug-Dachstreifen entlang des Rückens ----
     drawRoof(left, right, top);
     {
-      const nd = DEP * 0.6, ox = nd * DEP_X, oy = nd * DEP_Y;
-      const g = ctx.createLinearGradient(right, top, right + ox, top + oy);
+      // Bug-Dachstreifen entlang des Rückens; Tiefe verjüngt sich zur Spitze auf 0
+      const P0 = [right, top], P1 = [right + NOSE * 0.50, top - 2],
+            P2 = [right + NOSE * 0.86, top + H * 0.30], P3 = [tipX - 6, tipY - 8];
+      const B = (t) => {
+        const u = 1 - t;
+        return [u * u * u * P0[0] + 3 * u * u * t * P1[0] + 3 * u * t * t * P2[0] + t * t * t * P3[0],
+                u * u * u * P0[1] + 3 * u * u * t * P1[1] + 3 * u * t * t * P2[1] + t * t * t * P3[1]];
+      };
+      const N = 16, front = [], back = [];
+      for (let i = 0; i <= N; i++) {
+        const t = i / N, p = B(t), d = DEP * 0.55 * Math.pow(1 - t, 0.7);
+        front.push(p); back.push([p[0] + d * DEP_X, p[1] + d * DEP_Y]);
+      }
+      const g = ctx.createLinearGradient(front[0][0], front[0][1], back[0][0], back[0][1]);
       g.addColorStop(0, "#249063"); g.addColorStop(1, "#0d5136");
       ctx.fillStyle = g;
       ctx.beginPath();
-      ctx.moveTo(right, top);
-      noseTop();
-      ctx.lineTo(tipX + ox, tipY + 2 + oy);
-      ctx.lineTo(right + ox, top + oy);
+      ctx.moveTo(front[0][0], front[0][1]);
+      for (let i = 1; i <= N; i++) ctx.lineTo(front[i][0], front[i][1]);
+      for (let i = N; i >= 0; i--) ctx.lineTo(back[i][0], back[i][1]);
       ctx.closePath(); ctx.fill();
     }
 
