@@ -580,14 +580,16 @@
     const baseY = groundY - 24;
     const peakSpacing = 165;
     const heights = [150, 210, 120, 182, 138, 232, 162, 108, 196, 172];
+    const L = heights.length;
+    const hAt = (n) => heights[((n % L) + L) % L];   // feste Höhe je Welt-Gipfel
+    const start = Math.floor(offset / peakSpacing) - 1;
+    const end = Math.ceil((offset + W) / peakSpacing) + 1;
     ctx.save();
     ctx.beginPath();
     ctx.moveTo(0, baseY);
-    let idx = 0;
-    for (let x = -peakSpacing; x <= W + peakSpacing; x += peakSpacing) {
-      const px = x - (offset % peakSpacing);
-      const h = heights[(idx++) % heights.length];
-      ctx.lineTo(px + peakSpacing * 0.5, baseY - h);
+    for (let n = start; n <= end; n++) {
+      const px = n * peakSpacing - offset;
+      ctx.lineTo(px + peakSpacing * 0.5, baseY - hAt(n));
       ctx.lineTo(px + peakSpacing, baseY);
     }
     ctx.lineTo(W, baseY);
@@ -599,10 +601,9 @@
     ctx.fillStyle = mg; ctx.fillRect(0, baseY - 240, W, 240);
     // Schneekappen
     ctx.fillStyle = "rgba(244,248,253,0.95)";
-    idx = 0;
-    for (let x = -peakSpacing; x <= W + peakSpacing; x += peakSpacing) {
-      const px = x - (offset % peakSpacing) + peakSpacing * 0.5;
-      const h = heights[(idx++) % heights.length];
+    for (let n = start; n <= end; n++) {
+      const px = n * peakSpacing - offset + peakSpacing * 0.5;
+      const h = hAt(n);
       const peakY = baseY - h;
       ctx.beginPath();
       ctx.moveTo(px, peakY);
@@ -701,8 +702,8 @@
     ctx.moveTo(0, groundY);
     const step = 16;
     const yAt = (x) => baseY
-      - Math.sin((x + (offset % wavelength)) / wavelength * Math.PI * 2) * amp
-      - Math.sin((x + (offset % wavelength)) / (wavelength * 0.37)) * amp * 0.28;
+      - Math.sin((x + offset) / wavelength * Math.PI * 2) * amp
+      - Math.sin((x + offset) / (wavelength * 0.37)) * amp * 0.28;
     ctx.lineTo(0, yAt(0));
     for (let x = 0; x <= W; x += step) ctx.lineTo(x, yAt(x));
     ctx.lineTo(W, groundY);
@@ -719,11 +720,13 @@
   }
 
   function drawClouds(offset, groundY) {
-    const spacing = 380;
-    for (let i = -1; i < W / spacing + 2; i++) {
-      const base = i * spacing - (offset % spacing);
-      const y = groundY * (0.14 + (rnd(i * 3.3) * 0.28));
-      cloud(base, y, 30 + rnd(i + 1) * 22);
+    const spacing = 360;
+    const start = Math.floor(offset / spacing) - 1;
+    const end = Math.ceil((offset + W) / spacing) + 1;
+    for (let n = start; n <= end; n++) {
+      const x = n * spacing - offset;
+      const y = groundY * (0.12 + rnd(n * 3.3) * 0.3);
+      cloud(x, y, 28 + rnd(n + 1) * 22);
     }
   }
   function cloud(x, y, r) {
@@ -891,15 +894,17 @@
       ctx.closePath(); ctx.fill();
     }
 
-    // Wildblumen (bunte Heuwiese)
-    const boff = (camPos * 0.7) % 40;
+    // Wildblumen (bunte Heuwiese) – nahtlos an Welt-ID gebunden
+    const bScroll = camPos * 0.7;
+    const bSpacing = 26;
     const cols = ["#ffd23f", "#ff6b8a", "#ffffff", "#c084fc"];
-    for (let i = 0; i < 70; i++) {
-      const x = (i * 40 - boff * 4) % (W + 40);
-      const xx = x < 0 ? x + W + 40 : x;
-      const y = groundY + 8 + rnd(i) * (H - groundY - 12);
-      ctx.fillStyle = cols[(i * 7) % cols.length];
-      ctx.beginPath(); ctx.arc(xx, y, 2 + rnd(i + 5) * 1.4, 0, Math.PI * 2); ctx.fill();
+    const bStart = Math.floor(bScroll / bSpacing) - 1;
+    const bEnd = Math.ceil((bScroll + W) / bSpacing) + 1;
+    for (let n = bStart; n <= bEnd; n++) {
+      const x = n * bSpacing - bScroll + (rnd(n) - 0.5) * 22;
+      const y = groundY + 10 + rnd(n * 1.7) * (H - groundY - 18);
+      ctx.fillStyle = cols[((n % cols.length) + cols.length) % cols.length];
+      ctx.beginPath(); ctx.arc(x, y, 2 + rnd(n + 5) * 1.4, 0, Math.PI * 2); ctx.fill();
     }
 
     // Objektreihe (Bäume, Büsche, Bauernhof, Heuballen, Kuh) mit schneller Parallaxe
