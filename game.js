@@ -1187,8 +1187,8 @@
   // ---- 2.5D-Schrägprojektion (Kabinettprojektion) ----
   // Kamera von der Seite und schräg oben: "nach hinten" = auf dem Bildschirm nach oben-rechts.
   const DEP = 40;              // Tiefe (Breite) des Zugkörpers in Bildpunkten
-  const DEP_X = 0.52;          // Bildschirm-x pro Tiefeneinheit
-  const DEP_Y = -0.52;         // Bildschirm-y pro Tiefeneinheit (negativ = nach oben)
+  const DEP_X = 0.58;          // Bildschirm-x pro Tiefeneinheit
+  const DEP_Y = -0.40;         // Bildschirm-y pro Tiefeneinheit (negativ = nach oben; flacher = mehr Seite)
   const RAIL_DEP = 26;         // Tiefe des Gleises (Abstand nahe/ferne Schiene)
 
   // Deckfläche (Parallelogramm) von einer Vorderkante nach hinten extrudiert
@@ -1241,7 +1241,7 @@
   function drawGangway(xL, xR, top, bodyBottom) {
     const y0 = top + 12, y1 = bodyBottom - 3;
     // Dachbrücke (Schrägfläche), damit die Wagendächer verbunden wirken
-    topFace(xL - 2, xR + 2, top + 3, DEP, "#0b3d2b");
+    roofFace(xL - 2, xR + 2, top + 3, DEP);
     ctx.fillStyle = "#171b21";
     ctx.fillRect(xL - 3, y0, (xR - xL) + 6, y1 - y0);
     ctx.strokeStyle = "rgba(255,255,255,0.05)"; ctx.lineWidth = 1;
@@ -1346,20 +1346,35 @@
     ctx.fillStyle = "rgba(0,0,0,0.05)"; ctx.fillRect(left - 6, bodyBottom - 7, w + 12, 7); // Schürzenschatten
   }
 
+  // Belichtete Dachfläche mit Verlauf (vorne hell -> hinten dunkel)
+  function roofFace(x0, x1, topY, depth) {
+    const dx = depth * DEP_X, dy = depth * DEP_Y;
+    const g = ctx.createLinearGradient(x0, topY, x0 + dx, topY + dy);
+    g.addColorStop(0, "#2a9068"); g.addColorStop(0.5, "#187a56"); g.addColorStop(1, "#0d5136");
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(x0, topY); ctx.lineTo(x1, topY);
+    ctx.lineTo(x1 + dx, topY + dy); ctx.lineTo(x0 + dx, topY + dy);
+    ctx.closePath(); ctx.fill();
+  }
+
   // Dach-Oberfläche eines geraden Wagens (Schrägansicht)
   function drawRoof(left, right, top) {
-    topFace(left + 6, right - 6, top + 1, DEP, "#12684a");
-    // Hinterkante abschatten
-    const dxb = DEP * DEP_X, dyb = DEP * DEP_Y;
-    ctx.fillStyle = "rgba(0,0,0,0.20)";
-    ctx.beginPath();
-    ctx.moveTo(left + 6 + dxb, top + 1 + dyb); ctx.lineTo(right - 6 + dxb, top + 1 + dyb);
-    ctx.lineTo(right - 6 + dxb, top + 4 + dyb); ctx.lineTo(left + 6 + dxb, top + 4 + dyb);
-    ctx.closePath(); ctx.fill();
-    // Klimakästen auf der Dachfläche
+    const x0 = left + 12, x1 = right - 12;
+    const dx = DEP * DEP_X, dy = DEP * DEP_Y;
+    roofFace(x0, x1, top, DEP);
+    // weiche Schulter (Dach/Seite fängt Licht) – vordere Kante
+    ctx.strokeStyle = "rgba(255,255,255,0.30)"; ctx.lineWidth = 2; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(x0 + 2, top + 1); ctx.lineTo(x1 - 2, top + 1); ctx.stroke();
+    // dezente Dachkante hinten (Regenrinne) statt harter schwarzer Linie
+    ctx.strokeStyle = "rgba(255,255,255,0.10)"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x0 + dx, top + dy); ctx.lineTo(x1 + dx, top + dy); ctx.stroke();
+    // Klimakästen als kleine erhabene Kästchen (Oberseite + Front)
     for (let i = 0; i < 3; i++) {
-      const vu = left + 34 + i * 34, vd = DEP * 0.34;
-      topFace(vu + vd * DEP_X, vu + 18 + vd * DEP_X, top + 1 + vd * DEP_Y, 9, "rgba(210,220,228,0.5)");
+      const vu = x0 + 26 + i * 34, vd = DEP * 0.38;
+      const bx = vu + vd * DEP_X, by = top + vd * DEP_Y;
+      topFace(bx, bx + 20, by - 3, 9, "#c9d1d9");        // Oberseite (hell)
+      ctx.fillStyle = "#93a0ab"; ctx.fillRect(bx, by - 3, 20, 3);  // Front
     }
   }
 
@@ -1412,7 +1427,9 @@
     drawRoof(left, right, top);
     {
       const nd = DEP * 0.6, ox = nd * DEP_X, oy = nd * DEP_Y;
-      ctx.fillStyle = "#0f6246";
+      const g = ctx.createLinearGradient(right, top, right + ox, top + oy);
+      g.addColorStop(0, "#249063"); g.addColorStop(1, "#0d5136");
+      ctx.fillStyle = g;
       ctx.beginPath();
       ctx.moveTo(right, top);
       noseTop();
