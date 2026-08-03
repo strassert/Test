@@ -8,19 +8,34 @@ Du steuerst einen **Shinkansen E5 „Hayabusa"** auf der realen Strecke der
 **S‑Bahn Salzburg (Linie S2)** von **Seekirchen am Wallersee** nach
 **Salzburg Hauptbahnhof**.
 
-## Spielen
+## Spielen / Lokal starten
 
-Einfach `index.html` im Browser öffnen:
+Es ist eine rein statische Website — kein Build, kein Backend. Drei Wege:
 
 ```bash
-# Variante 1: Datei direkt öffnen
-xdg-open index.html      # Linux
-open index.html          # macOS
+# 1) Schnellstart-Skript (nur Python 3 nötig)
+./serve.sh            # → http://localhost:8000
+./serve.sh 9000       # optional anderer Port
 
-# Variante 2: lokaler Webserver (empfohlen)
-python3 -m http.server 8000
-# dann http://localhost:8000 aufrufen
+# 2) Docker / Docker Compose (z. B. auf dem Proxmox-Host)
+docker compose up -d  # → http://localhost:8080
+docker compose down   # stoppen
+
+# 3) Datei direkt öffnen (ohne Server)
+xdg-open index.html   # Linux
+open index.html       # macOS
 ```
+
+Die Setup-Dateien im Repo:
+
+| Datei | Zweck |
+|-------|-------|
+| `serve.sh` | Lokaler Schnellstart über `python3 -m http.server` |
+| `Dockerfile` | Winziges `nginx:alpine`-Image, das die Spieldateien ausliefert |
+| `docker-compose.yml` | Startet den Container auf Port 8080 (`restart: unless-stopped`) |
+
+Für den Betrieb hinter einer eigenen Domain mit automatischem HTTPS eignet sich
+ein Reverse Proxy wie Caddy oder Traefik vor dem Container.
 
 ## Strecke
 
