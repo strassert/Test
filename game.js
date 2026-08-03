@@ -31,24 +31,31 @@
   const KMH = 3.6;               // m/s -> km/h
 
   // ---------- Streckendefinition ----------
-  // Bahnhöfe entlang der Strecke (Position in Metern ab Start).
+  // Reale S-Bahn-Strecke Salzburg, Linie S2:
+  // Seekirchen am Wallersee → Seekirchen Stadt → Eugendorf →
+  // Hallwang-Elixhausen → Salzburg Kasern → Salzburg Hauptbahnhof.
+  // Abfahrtsbahnhof (Start, pos 0); der Zug fährt von hier ab.
+  const ORIGIN = { name: "Seekirchen am Wallersee", pos: 0 };
+
+  // Anzufahrende Halte (Position in Metern ab Seekirchen am Wallersee,
+  // ~streckengetreue Abstände; limit = Streckenhöchsttempo bis zum Halt).
   const STATIONS = [
-    { name: "Talheim",        pos: 900,   limit: 100 },
-    { name: "Bergkirchen",    pos: 2600,  limit: 80  },
-    { name: "Seebrück",       pos: 4600,  limit: 120 },
-    { name: "Waldau",         pos: 6900,  limit: 90  },
-    { name: "Hafenstadt Hbf", pos: 9500,  limit: 60  },
+    { name: "Seekirchen Stadt",     pos: 1400,  limit: 80  },
+    { name: "Eugendorf",            pos: 3200,  limit: 100 },
+    { name: "Hallwang-Elixhausen",  pos: 7400,  limit: 110 },
+    { name: "Salzburg Kasern",      pos: 10900, limit: 100 },
+    { name: "Salzburg Hauptbahnhof", pos: 14500, limit: 80 },
   ];
   const ROUTE_END = STATIONS[STATIONS.length - 1].pos + 60;
   const PLATFORM_LEN = 120;      // Bahnsteiglänge (m)
   const STOP_TOLERANCE = 8;      // perfekter Halt innerhalb ± m der Bahnsteigmitte
 
-  // Signale entlang der Strecke. state wird dynamisch gesetzt.
+  // Signale zwischen den Halten. state wird dynamisch gesetzt.
   const SIGNALS = [
-    { pos: 1900, state: "green" },
-    { pos: 3700, state: "green" },
-    { pos: 5700, state: "green" },
-    { pos: 8100, state: "green" },
+    { pos: 2300, state: "green" },
+    { pos: 5300, state: "green" },
+    { pos: 9000, state: "green" },
+    { pos: 12700, state: "green" },
   ];
 
   // ---------- Spielzustand ----------
@@ -325,6 +332,7 @@
 
     drawSky(groundY);
     drawParallax(camPos, groundY);
+    drawLandmarks(camPos, groundY, trainScreenX);
     drawGround(groundY);
     drawTrack(camPos, groundY, trainScreenX);
     drawStations(camPos, groundY, trainScreenX);
@@ -356,14 +364,55 @@
   }
 
   function drawParallax(camPos, groundY) {
+    // Alpenkette am Horizont (Salzburger Land: Untersberg, Gaisberg …)
+    drawAlps(camPos * 0.07, groundY);
     // Ferne Berge (langsam)
-    layerHills(camPos * 0.12, groundY, groundY - 150, "#2c4a6e", 520, 130, 0.15);
-    // Nähere Hügel
-    layerHills(camPos * 0.28, groundY, groundY - 70, "#3a6b57", 360, 90, 0.6);
+    layerHills(camPos * 0.12, groundY, groundY - 140, "#3a5c7a", 520, 120, 0.15);
+    // Nähere Hügel (Voralpenland)
+    layerHills(camPos * 0.28, groundY, groundY - 66, "#3f7a5c", 360, 90, 0.6);
     // Wolken
     drawClouds(camPos * 0.06, groundY);
     // Bäume nahe (schnell), separat in drawGround-Bereich
     drawTrees(camPos * 0.85, groundY);
+  }
+
+  // Schneebedeckte Alpengipfel am Horizont
+  function drawAlps(offset, groundY) {
+    const baseY = groundY - 40;
+    const peakSpacing = 150;
+    const heights = [150, 205, 120, 178, 138, 225, 160, 110, 190];
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(0, baseY);
+    let idx = 0;
+    for (let x = -peakSpacing; x <= W + peakSpacing; x += peakSpacing) {
+      const px = x - (offset % peakSpacing);
+      const h = heights[(idx++) % heights.length];
+      ctx.lineTo(px, baseY - h);
+      ctx.lineTo(px + peakSpacing / 2, baseY);
+    }
+    ctx.lineTo(W, baseY);
+    ctx.closePath();
+    ctx.fillStyle = "#5f7793";
+    ctx.fill();
+    ctx.clip();
+    // Schneekappen (heller oberer Bereich)
+    ctx.fillStyle = "rgba(240,246,252,0.92)";
+    idx = 0;
+    for (let x = -peakSpacing; x <= W + peakSpacing; x += peakSpacing) {
+      const px = x - (offset % peakSpacing);
+      const h = heights[(idx++) % heights.length];
+      const peakY = baseY - h;
+      ctx.beginPath();
+      ctx.moveTo(px, peakY);
+      ctx.lineTo(px - h * 0.16, peakY + h * 0.28);
+      ctx.lineTo(px - h * 0.05, peakY + h * 0.20);
+      ctx.lineTo(px + h * 0.06, peakY + h * 0.30);
+      ctx.lineTo(px + h * 0.16, peakY + h * 0.24);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.restore();
   }
 
   function layerHills(offset, groundY, baseY, color, wavelength, amp, alpha) {
@@ -421,6 +470,73 @@
     }
   }
 
+  // Streckenspezifische Landmarken: Wallersee (Start) & Festung Hohensalzburg (Ziel)
+  function drawLandmarks(camPos, groundY, trainScreenX) {
+    const par = 0.42;
+    const sx = (wp) => trainScreenX + (wp - camPos) / M_PER_PX * par;
+
+    // --- Wallersee bei Seekirchen (rund um Streckenkilometer 0) ---
+    const lakeX = sx(600);
+    if (lakeX > -360 && lakeX < W + 360) {
+      const ly = groundY - 3;
+      const lg = ctx.createLinearGradient(0, ly - 16, 0, ly + 6);
+      lg.addColorStop(0, "#6ea9c9"); lg.addColorStop(1, "#3f7fa6");
+      ctx.fillStyle = lg;
+      ctx.beginPath();
+      ctx.ellipse(lakeX, ly, 300, 20, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // Glitzernde Reflexe
+      ctx.fillStyle = "rgba(255,255,255,0.4)";
+      for (let i = -4; i <= 4; i++) {
+        ctx.fillRect(lakeX + i * 44 - 8, ly - 4 + (i % 2) * 4, 16, 1.5);
+      }
+      // Schilfufer
+      ctx.strokeStyle = "#4c7a3e"; ctx.lineWidth = 2;
+      for (let i = -5; i <= 5; i++) {
+        const rx = lakeX + i * 52;
+        ctx.beginPath(); ctx.moveTo(rx, ly + 2); ctx.lineTo(rx, ly - 8); ctx.stroke();
+      }
+    }
+
+    // --- Festung Hohensalzburg auf dem Festungsberg (vor Salzburg Hbf) ---
+    const fX = sx(13600);
+    if (fX > -260 && fX < W + 260) {
+      const base = groundY - 2;
+      // Festungsberg
+      ctx.fillStyle = "#4a6b4a";
+      ctx.beginPath();
+      ctx.moveTo(fX - 170, base);
+      ctx.quadraticCurveTo(fX - 60, base - 150, fX + 30, base - 158);
+      ctx.quadraticCurveTo(fX + 130, base - 150, fX + 180, base);
+      ctx.closePath();
+      ctx.fill();
+      // Baumbewuchs (dunkler)
+      ctx.fillStyle = "rgba(30,60,40,0.5)";
+      ctx.beginPath();
+      ctx.moveTo(fX - 170, base);
+      ctx.quadraticCurveTo(fX - 90, base - 70, fX - 30, base - 90);
+      ctx.lineTo(fX - 30, base); ctx.closePath(); ctx.fill();
+      // Festung (Mauern + Türme)
+      const cy = base - 158;
+      ctx.fillStyle = "#e8e4da";
+      ctx.fillRect(fX - 58, cy, 116, 40);       // Hauptmauer
+      ctx.fillRect(fX - 70, cy + 14, 140, 26);  // untere Mauer
+      // Türme mit Zinnen
+      for (const [tx, tw, th] of [[-70, 22, 30], [-8, 20, 46], [50, 22, 34]]) {
+        ctx.fillStyle = "#f0ede5";
+        ctx.fillRect(fX + tx, cy - th + 30, tw, th);
+        ctx.fillStyle = "#b8342a"; // rote Dächer
+        ctx.beginPath();
+        ctx.moveTo(fX + tx - 2, cy - th + 30);
+        ctx.lineTo(fX + tx + tw / 2, cy - th + 18);
+        ctx.lineTo(fX + tx + tw + 2, cy - th + 30);
+        ctx.closePath(); ctx.fill();
+        ctx.fillStyle = "#6b7078"; // Fenster
+        ctx.fillRect(fX + tx + tw / 2 - 2, cy - th + 36, 4, 8);
+      }
+    }
+  }
+
   function drawGround(groundY) {
     const g = ctx.createLinearGradient(0, groundY, 0, H);
     g.addColorStop(0, "#4f7d3f");
@@ -451,45 +567,67 @@
   }
 
   function drawStations(camPos, groundY, trainScreenX) {
+    // Abfahrtsbahnhof (Start) + alle Halte zeichnen
+    drawPlatform(ORIGIN, false, true, camPos, groundY, trainScreenX);
     for (let i = 0; i < STATIONS.length; i++) {
-      const st = STATIONS[i];
-      const cx = worldToScreen(st.pos, camPos, trainScreenX);
-      const halfW = (PLATFORM_LEN / 2) / M_PER_PX;
-      if (cx + halfW < -50 || cx - halfW > W + 50) continue;
-
-      const platY = groundY + 6;
-      // Bahnsteig
-      ctx.fillStyle = "#b9b2a6";
-      ctx.fillRect(cx - halfW, platY - 18, halfW * 2, 18);
-      ctx.fillStyle = "#d8d2c6";
-      ctx.fillRect(cx - halfW, platY - 18, halfW * 2, 4);
-
-      // Haltemarkierung (Bahnsteigmitte)
-      ctx.fillStyle = (i === game.stationIdx) ? "#ffd23f" : "#8a8478";
-      ctx.fillRect(cx - 2, platY - 30, 4, 14);
-
-      // Stationsgebäude
-      const bx = cx - halfW - 8;
-      ctx.fillStyle = "#8c4a3a";
-      ctx.fillRect(bx - 46, platY - 66, 46, 48);
-      ctx.fillStyle = "#5c2f24";
-      ctx.beginPath();
-      ctx.moveTo(bx - 52, platY - 66);
-      ctx.lineTo(bx - 23, platY - 84);
-      ctx.lineTo(bx + 6, platY - 66);
-      ctx.closePath();
-      ctx.fill();
-      ctx.fillStyle = "#ffe08a";
-      ctx.fillRect(bx - 38, platY - 56, 12, 12);
-      ctx.fillRect(bx - 20, platY - 56, 12, 12);
-
-      // Name
-      ctx.fillStyle = "#0e1622";
-      ctx.font = "bold 13px system-ui, sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText(st.name, cx, platY - 36);
-      ctx.textAlign = "left";
+      drawPlatform(STATIONS[i], i === game.stationIdx, false, camPos, groundY, trainScreenX);
     }
+  }
+
+  function drawPlatform(st, isNext, isOrigin, camPos, groundY, trainScreenX) {
+    const cx = worldToScreen(st.pos, camPos, trainScreenX);
+    const halfW = (PLATFORM_LEN / 2) / M_PER_PX;
+    if (cx + halfW < -60 || cx - halfW > W + 60) return;
+
+    const platY = groundY + 6;
+    // Bahnsteig
+    ctx.fillStyle = "#b9b2a6";
+    ctx.fillRect(cx - halfW, platY - 18, halfW * 2, 18);
+    ctx.fillStyle = "#d8d2c6";
+    ctx.fillRect(cx - halfW, platY - 18, halfW * 2, 4);
+    // Bahnsteigdach (ÖBB-typisch)
+    ctx.fillStyle = "rgba(40,55,70,0.85)";
+    ctx.fillRect(cx - halfW + 6, platY - 46, halfW * 2 - 12, 5);
+    for (let px = cx - halfW + 16; px < cx + halfW - 12; px += 46) {
+      ctx.fillStyle = "#5a6470";
+      ctx.fillRect(px, platY - 41, 3, 23);
+    }
+
+    // Haltemarkierung (Bahnsteigmitte)
+    ctx.fillStyle = isNext ? "#ffd23f" : "#8a8478";
+    ctx.fillRect(cx - 2, platY - 30, 4, 14);
+
+    // Empfangsgebäude
+    const bx = cx - halfW - 8;
+    ctx.fillStyle = isOrigin ? "#7a8a5a" : "#b23a2f";
+    ctx.fillRect(bx - 48, platY - 60, 48, 42);
+    ctx.fillStyle = "#3a4657";
+    ctx.beginPath();
+    ctx.moveTo(bx - 54, platY - 60);
+    ctx.lineTo(bx - 24, platY - 78);
+    ctx.lineTo(bx + 6, platY - 60);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "#ffe08a";
+    ctx.fillRect(bx - 40, platY - 50, 11, 11);
+    ctx.fillRect(bx - 22, platY - 50, 11, 11);
+    ctx.fillStyle = "#6b4a3a";
+    ctx.fillRect(bx - 31, platY - 34, 12, 16);
+
+    // Stationsschild (ÖBB-blau)
+    ctx.font = "bold 12px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    const tw = ctx.measureText(st.name).width;
+    ctx.fillStyle = "#1f4e8c";
+    roundRect(cx - tw / 2 - 8, platY - 40, tw + 16, 17, 3); ctx.fill();
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText(st.name, cx, platY - 28);
+    if (isOrigin) {
+      ctx.fillStyle = "#cfe0f5";
+      ctx.font = "9px system-ui, sans-serif";
+      ctx.fillText("Start", cx, platY - 46);
+    }
+    ctx.textAlign = "left";
   }
 
   function drawSignals(camPos, groundY, trainScreenX) {
@@ -565,10 +703,19 @@
     }
   }
 
+  // Shinkansen-E5-Farben ("Hayabusa")
+  const SK_GREEN_TOP = "#12653f";
+  const SK_GREEN_BOT = "#0c4a30";
+  const SK_WHITE_TOP = "#f3f6f9";
+  const SK_WHITE_BOT = "#d5dde3";
+  const SK_PINK = "#e5006e";
+  const SK_WIN = "#0c1a24";
+
   function drawTrain(x, groundY) {
     const railY = groundY + 26;
     const bodyBottom = railY - 4;
-    const spin = -game.pos / (13 * M_PER_PX);
+    // Räder rollen vorwärts (nach rechts) => im Uhrzeigersinn => positive Rotation
+    const spin = game.pos / (11 * M_PER_PX);
 
     ctx.save();
     // leichtes Wippen bei Geschwindigkeit
@@ -578,19 +725,19 @@
     // Gemeinsamer Schatten unter dem ganzen Zug
     ctx.fillStyle = "rgba(0,0,0,0.28)";
     ctx.beginPath();
-    ctx.ellipse(x - 180, bodyBottom + 8, 370, 9, 0, 0, Math.PI * 2);
+    ctx.ellipse(x - 150, bodyBottom + 8, 400, 9, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Zwei angehängte Personenwagen (hinter der Lok, also links)
-    drawCar(x - 372, bodyBottom, spin);
-    drawCar(x - 210, bodyBottom, spin);
-    // Kupplungen
+    // Angehängte Wagen (hinter dem Triebkopf, also links); mittlerer trägt Pantograph
+    drawCar(x - 372, groundY, bodyBottom, spin, false);
+    drawCar(x - 210, groundY, bodyBottom, spin, true);
+    // Übergänge/Kupplungen
     ctx.fillStyle = "#1a1e24";
-    ctx.fillRect(x - 118, bodyBottom - 16, 20, 6);
-    ctx.fillRect(x - 292, bodyBottom - 16, 12, 6);
+    ctx.fillRect(x - 108, bodyBottom - 30, 14, 24);
+    ctx.fillRect(x - 285, bodyBottom - 30, 12, 24);
 
-    // Lokomotive (Front zeigt nach rechts)
-    drawLoco(x, groundY, bodyBottom, spin);
+    // Triebkopf (Front mit langem Bug zeigt nach rechts)
+    drawLead(x, groundY, bodyBottom, spin);
 
     ctx.restore();
   }
@@ -626,204 +773,184 @@
     }
   }
 
-  function drawLoco(cx, groundY, bodyBottom, spin) {
-    const len = 168, height = 66;
-    const left = cx - len * 0.42;
-    const top = bodyBottom - height;
-    const noseR = left + len;      // Front rechts
-    const wireY = groundY - WIRE_H;
-
-    // ---- Stromabnehmer (Pantograph) auf dem Dach, berührt Fahrdraht ----
-    const panX = left + len * 0.4;
-    const baseY = top - 2;
+  // Stromabnehmer (Einholm-Pantograph), berührt den Fahrdraht
+  function drawPantograph(panX, roofY, wireY) {
     ctx.strokeStyle = "#2b333d"; ctx.lineWidth = 2.4; ctx.lineCap = "round";
-    // Sockelisolatoren
     ctx.fillStyle = "#3a424c";
-    ctx.fillRect(panX - 20, baseY - 3, 6, 4);
-    ctx.fillRect(panX + 14, baseY - 3, 6, 4);
-    // Scherenarme
+    ctx.fillRect(panX - 16, roofY - 3, 32, 4);           // Sockel
     ctx.beginPath();
-    ctx.moveTo(panX - 17, baseY - 2); ctx.lineTo(panX + 4, wireY + 4);
-    ctx.moveTo(panX + 17, baseY - 2); ctx.lineTo(panX + 4, wireY + 4);
-    ctx.moveTo(panX + 4, wireY + 4); ctx.lineTo(panX - 14, wireY + 2);
+    ctx.moveTo(panX - 12, roofY - 1); ctx.lineTo(panX + 6, wireY + 5);   // Unterarm
+    ctx.moveTo(panX + 6, wireY + 5);  ctx.lineTo(panX - 10, wireY + 2);  // Oberarm
     ctx.stroke();
-    // Schleifleiste (Kontakt zum Draht)
     ctx.strokeStyle = "#1a1e24"; ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.moveTo(panX - 22, wireY + 2); ctx.lineTo(panX + 12, wireY + 2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(panX - 20, wireY + 2); ctx.lineTo(panX + 14, wireY + 2); ctx.stroke(); // Schleifleiste
     ctx.lineWidth = 1;
+  }
 
-    // ---- Wagenkasten mit stromlinienförmiger Nase ----
-    const g = ctx.createLinearGradient(0, top, 0, bodyBottom);
-    g.addColorStop(0, "#ff5a4d");
-    g.addColorStop(0.45, "#e23b3b");
-    g.addColorStop(1, "#a51f1f");
-    ctx.fillStyle = g;
+  // Fensterband (durchgehend, getönt) mit Glanzsegmenten
+  function windowBand(x0, x1, y, h) {
+    ctx.fillStyle = SK_WIN;
+    roundRect(x0, y, x1 - x0, h, h / 2); ctx.fill();
+    ctx.fillStyle = "rgba(150,200,235,0.28)";
+    const n = Math.floor((x1 - x0) / 22);
+    for (let i = 0; i < n; i++) roundRect(x0 + 6 + i * 22, y + 2, 13, h - 4, 2), ctx.fill();
+  }
+
+  // Triebkopf mit langem "Hayabusa"-Bug (Front nach rechts)
+  function drawLead(cx, groundY, bodyBottom, spin) {
+    const height = 62;
+    const top = bodyBottom - height;
+    const beltY = top + 30;                 // Übergang Grün/Weiß (pinke Linie)
+    const bodyLeft = cx - 74;
+    const bodyRight = cx + 44;               // Bug/Körper-Übergang
+    const tipX = cx + 132, tipY = bodyBottom - 15;
+
+    // ---- Körper-Umriss (Körper + langer Bug) ----
     ctx.beginPath();
-    ctx.moveTo(left + 8, top);
-    ctx.lineTo(noseR - 34, top);
-    // Dach->Nase Rundung
-    ctx.quadraticCurveTo(noseR + 4, top + 6, noseR + 6, top + height * 0.55);
-    ctx.quadraticCurveTo(noseR + 6, bodyBottom, noseR - 14, bodyBottom);
-    ctx.lineTo(left + 8, bodyBottom);
-    ctx.quadraticCurveTo(left, bodyBottom, left, bodyBottom - 8);
-    ctx.lineTo(left, top + 8);
-    ctx.quadraticCurveTo(left, top, left + 8, top);
+    ctx.moveTo(bodyLeft + 8, top);
+    ctx.lineTo(bodyRight, top);
+    ctx.quadraticCurveTo(bodyRight + 76, top + 3, tipX, tipY);        // Bugrücken
+    ctx.quadraticCurveTo(bodyRight + 58, bodyBottom + 1, bodyRight, bodyBottom); // Bugunterseite
+    ctx.lineTo(bodyLeft + 6, bodyBottom);
+    ctx.quadraticCurveTo(bodyLeft, bodyBottom, bodyLeft, bodyBottom - 8);
+    ctx.lineTo(bodyLeft, top + 8);
+    ctx.quadraticCurveTo(bodyLeft, top, bodyLeft + 8, top);
+    ctx.closePath();
+
+    ctx.save();
+    ctx.clip();
+    // Weiß (Basis)
+    const wg = ctx.createLinearGradient(0, top, 0, bodyBottom);
+    wg.addColorStop(0, SK_WHITE_TOP); wg.addColorStop(1, SK_WHITE_BOT);
+    ctx.fillStyle = wg;
+    ctx.fillRect(bodyLeft - 4, top - 4, tipX - bodyLeft + 12, height + 8);
+    // Grün (Dach + über den Bug laufend)
+    const gg = ctx.createLinearGradient(0, top, 0, beltY);
+    gg.addColorStop(0, SK_GREEN_TOP); gg.addColorStop(1, SK_GREEN_BOT);
+    ctx.fillStyle = gg;
+    ctx.beginPath();
+    ctx.moveTo(bodyLeft - 4, top - 4);
+    ctx.lineTo(bodyRight, top);
+    ctx.quadraticCurveTo(bodyRight + 76, top + 3, tipX, tipY);
+    ctx.quadraticCurveTo(bodyRight + 40, tipY + 9, bodyRight, beltY);
+    ctx.lineTo(bodyLeft - 4, beltY);
+    ctx.closePath();
+    ctx.fill();
+    // Pinke Signaturlinie entlang Gürtellinie und Bug
+    ctx.strokeStyle = SK_PINK; ctx.lineWidth = 3.2; ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(bodyLeft, beltY + 1.5);
+    ctx.lineTo(bodyRight, beltY + 1.5);
+    ctx.quadraticCurveTo(bodyRight + 42, tipY + 11, tipX - 6, tipY + 5);
+    ctx.stroke();
+    // Glanz auf dem Dach
+    ctx.strokeStyle = "rgba(255,255,255,0.22)"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(bodyLeft + 8, top + 5); ctx.lineTo(bodyRight + 4, top + 6); ctx.stroke();
+    ctx.restore();
+
+    // ---- Fensterband (weißer Bereich) ----
+    windowBand(bodyLeft + 12, bodyRight - 4, beltY + 6, 15);
+
+    // ---- Frontscheibe (Fahrerstand, schräg an der Bugwurzel) ----
+    ctx.fillStyle = SK_WIN;
+    ctx.beginPath();
+    ctx.moveTo(bodyRight - 6, top + 9);
+    ctx.quadraticCurveTo(bodyRight + 24, top + 11, bodyRight + 30, beltY - 2);
+    ctx.lineTo(bodyRight + 8, beltY - 1);
+    ctx.lineTo(bodyRight - 6, top + 24);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "rgba(170,215,250,0.5)";
+    ctx.beginPath();
+    ctx.moveTo(bodyRight - 2, top + 12);
+    ctx.lineTo(bodyRight + 14, top + 14);
+    ctx.lineTo(bodyRight + 4, beltY - 3);
     ctx.closePath();
     ctx.fill();
 
-    // Glanzstreifen (Reflexion) auf der Flanke
-    ctx.fillStyle = "rgba(255,255,255,0.16)";
-    ctx.fillRect(left + 6, top + 14, len - 30, 4);
-
-    // Dachband (dunkler)
-    ctx.fillStyle = "rgba(0,0,0,0.22)";
-    ctx.beginPath();
-    ctx.moveTo(left + 8, top);
-    ctx.lineTo(noseR - 34, top);
-    ctx.quadraticCurveTo(noseR - 2, top + 4, noseR - 4, top + 12);
-    ctx.lineTo(left + 6, top + 12);
-    ctx.closePath();
-    ctx.fill();
-    // Dachtechnik (Lüfter/Kästen)
-    ctx.fillStyle = "#5a6470";
-    for (let i = 0; i < 3; i++) ctx.fillRect(left + 22 + i * 22, top + 2, 14, 5);
-
-    // Zierstreifen (Livery)
-    ctx.fillStyle = "#ffd23f";
-    ctx.fillRect(left + 2, top + height - 20, len - 20, 6);
-    ctx.fillStyle = "#1c2530";
-    ctx.fillRect(left + 2, top + height - 12, len - 18, 3);
-
-    // Frontscheibe (schräg)
-    ctx.fillStyle = "#0e2438";
-    ctx.beginPath();
-    ctx.moveTo(noseR - 30, top + 8);
-    ctx.lineTo(noseR - 6, top + 12);
-    ctx.lineTo(noseR - 4, top + 30);
-    ctx.lineTo(noseR - 34, top + 28);
-    ctx.closePath();
-    ctx.fill();
-    // Reflexion
-    ctx.fillStyle = "rgba(180,220,255,0.5)";
-    ctx.beginPath();
-    ctx.moveTo(noseR - 28, top + 10);
-    ctx.lineTo(noseR - 16, top + 12);
-    ctx.lineTo(noseR - 22, top + 26);
-    ctx.lineTo(noseR - 32, top + 25);
-    ctx.closePath();
-    ctx.fill();
-
-    // Seitenfenster mit Rahmen
-    for (let i = 0; i < 3; i++) {
-      const wx = left + 24 + i * 34;
-      ctx.fillStyle = "#0e2438";
-      roundRect(wx - 1, top + 15, 26, 20, 4); ctx.fill();
-      const wg = ctx.createLinearGradient(0, top + 15, 0, top + 35);
-      wg.addColorStop(0, "#bfe3ff"); wg.addColorStop(1, "#7fb4dc");
-      ctx.fillStyle = wg;
-      roundRect(wx + 1, top + 17, 22, 16, 3); ctx.fill();
-      ctx.fillStyle = "rgba(255,255,255,0.35)";
-      roundRect(wx + 2, top + 18, 8, 14, 2); ctx.fill();
-    }
-
-    // Loknummer-Plakette
-    ctx.fillStyle = "rgba(0,0,0,0.35)";
-    roundRect(left + 6, top + height - 34, 30, 11, 3); ctx.fill();
-    ctx.fillStyle = "#e8eefc";
-    ctx.font = "bold 8px system-ui, sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText("101 042", left + 21, top + height - 25);
-    ctx.textAlign = "left";
-
-    // Scheinwerfer + Lichtkegel
-    ctx.fillStyle = "#fff7cc";
-    ctx.beginPath(); ctx.arc(noseR - 8, top + height - 26, 4, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(noseR - 8, top + height - 14, 3.5, 0, Math.PI * 2); ctx.fill();
+    // ---- Scheinwerfer am Bug + Lichtkegel ----
+    ctx.fillStyle = "#eaf6ff";
+    ctx.beginPath(); ctx.ellipse(bodyRight + 60, tipY - 4, 5, 3, -0.2, 0, Math.PI * 2); ctx.fill();
     if (game.vel > 0.5) {
-      const glow = Math.min(0.22, 0.08 + game.vel * 0.004);
-      ctx.fillStyle = `rgba(255,247,204,${glow})`;
+      const glow = Math.min(0.22, 0.07 + game.vel * 0.003);
+      ctx.fillStyle = `rgba(235,246,255,${glow})`;
       ctx.beginPath();
-      ctx.moveTo(noseR - 4, top + height - 28);
-      ctx.lineTo(noseR + 90, top + height - 48);
-      ctx.lineTo(noseR + 90, top + height - 2);
+      ctx.moveTo(bodyRight + 62, tipY - 6);
+      ctx.lineTo(tipX + 70, tipY - 26);
+      ctx.lineTo(tipX + 70, tipY + 12);
       ctx.closePath();
       ctx.fill();
     }
-
-    // Puffer/Bahnräumer vorne
-    ctx.fillStyle = "#2a3038";
-    ctx.beginPath();
-    ctx.moveTo(noseR - 12, bodyBottom);
-    ctx.lineTo(noseR + 4, bodyBottom);
-    ctx.lineTo(noseR - 6, bodyBottom + 10);
-    ctx.lineTo(noseR - 24, bodyBottom + 10);
-    ctx.closePath();
-    ctx.fill();
+    // Baureihen-Kennung
+    ctx.fillStyle = SK_PINK;
+    ctx.font = "bold 9px system-ui, sans-serif";
+    ctx.textAlign = "left";
+    ctx.fillText("E5", bodyLeft + 10, beltY - 6);
 
     // Drehgestelle
-    drawBogie(left + 30, bodyBottom + 4, spin);
-    drawBogie(left + len - 44, bodyBottom + 4, spin);
+    drawBogie(bodyLeft + 26, bodyBottom + 4, spin);
+    drawBogie(bodyRight - 6, bodyBottom + 4, spin);
 
     // Bremsfunken
     if ((game.brake > 0.6 || game.emergency) && game.vel > 4) {
       for (let i = 0; i < 5; i++) {
         ctx.fillStyle = `rgba(255,${180 + Math.random() * 60 | 0},80,${Math.random()})`;
-        const sx = left + 24 + Math.random() * 40;
+        const sx = bodyLeft + 20 + Math.random() * 40;
         ctx.fillRect(sx, bodyBottom + 8 + Math.random() * 8, 2, 2);
       }
     }
-    // Hupen-Dampf
+    // Signalhorn-Effekt
     if (game.horn > 0) {
       ctx.fillStyle = `rgba(255,255,255,${game.horn})`;
       for (let i = 0; i < 5; i++) {
         ctx.beginPath();
-        ctx.arc(noseR + 8 + i * 12, top - 4 - i * 5, 4 + i, 0, Math.PI * 2);
+        ctx.arc(tipX + 6 + i * 12, tipY - 8 - i * 5, 4 + i, 0, Math.PI * 2);
         ctx.fill();
       }
     }
   }
 
-  function drawCar(cx, bodyBottom, spin) {
-    const len = 150, height = 60;
+  // Mittel-/Endwagen im E5-Design
+  function drawCar(cx, groundY, bodyBottom, spin, pantograph) {
+    const len = 150, height = 62;
     const left = cx - len / 2;
     const top = bodyBottom - height;
+    const beltY = top + 30;
 
-    // Kasten mit gerundetem Dach
-    const g = ctx.createLinearGradient(0, top, 0, bodyBottom);
-    g.addColorStop(0, "#f0f3f7");
-    g.addColorStop(1, "#c3ccd6");
-    ctx.fillStyle = g;
-    roundRect(left, top, len, height, 12); ctx.fill();
+    if (pantograph) drawPantograph(cx, top - 1, groundY - WIRE_H);
 
-    // Dachband
-    ctx.fillStyle = "#9aa5b1";
-    roundRect(left + 2, top, len - 4, 12, 10); ctx.fill();
+    // Körper (weiße Basis, gerundetes Dach)
+    ctx.save();
+    roundRect(left, top, len, height, 13);
+    ctx.clip();
+    const wg = ctx.createLinearGradient(0, top, 0, bodyBottom);
+    wg.addColorStop(0, SK_WHITE_TOP); wg.addColorStop(1, SK_WHITE_BOT);
+    ctx.fillStyle = wg;
+    ctx.fillRect(left, top, len, height);
+    // Grünes Dach bis zur Gürtellinie
+    const gg = ctx.createLinearGradient(0, top, 0, beltY);
+    gg.addColorStop(0, SK_GREEN_TOP); gg.addColorStop(1, SK_GREEN_BOT);
+    ctx.fillStyle = gg;
+    ctx.fillRect(left, top, len, beltY - top);
+    // Pinke Signaturlinie
+    ctx.fillStyle = SK_PINK;
+    ctx.fillRect(left, beltY, len, 3);
+    // Dachglanz
+    ctx.fillStyle = "rgba(255,255,255,0.18)";
+    ctx.fillRect(left + 6, top + 4, len - 12, 3);
+    ctx.restore();
 
-    // Zierstreifen passend zur Lok
-    ctx.fillStyle = "#e23b3b";
-    ctx.fillRect(left + 4, top + height - 22, len - 8, 7);
-    ctx.fillStyle = "#ffd23f";
-    ctx.fillRect(left + 4, top + height - 14, len - 8, 3);
-
-    // Fensterreihe
-    for (let i = 0; i < 5; i++) {
-      const wx = left + 14 + i * 27;
-      ctx.fillStyle = "#0e2438";
-      roundRect(wx - 1, top + 15, 22, 20, 4); ctx.fill();
-      const wg = ctx.createLinearGradient(0, top + 15, 0, top + 35);
-      wg.addColorStop(0, "#cfeaff"); wg.addColorStop(1, "#8bbde0");
-      ctx.fillStyle = wg;
-      roundRect(wx + 1, top + 17, 18, 16, 3); ctx.fill();
-      ctx.fillStyle = "rgba(255,255,255,0.35)";
-      roundRect(wx + 2, top + 18, 6, 14, 2); ctx.fill();
+    // Fensterband
+    windowBand(left + 10, left + len - 10, beltY + 6, 15);
+    // Türen (weiß, schmale Fugen)
+    ctx.strokeStyle = "rgba(120,140,155,0.7)"; ctx.lineWidth = 1;
+    for (const dx of [24, len - 24]) {
+      ctx.beginPath(); ctx.moveTo(left + dx, beltY + 4); ctx.lineTo(left + dx, bodyBottom - 6); ctx.stroke();
     }
-    // Tür
-    ctx.fillStyle = "#8a95a1";
-    ctx.fillRect(left + len - 16, top + 14, 10, height - 30);
 
     // Drehgestelle
-    drawBogie(left + 30, bodyBottom + 4, spin);
-    drawBogie(left + len - 30, bodyBottom + 4, spin);
+    drawBogie(left + 28, bodyBottom + 4, spin);
+    drawBogie(left + len - 28, bodyBottom + 4, spin);
   }
 
   function drawPauseOverlay() {
@@ -917,9 +1044,16 @@
       running: true, paused: false, pos: 0, vel: 0, throttle: 0, brake: 0,
       emergency: false, limit: STATIONS[0].limit, score: 0, finished: false,
       stationIdx: 0, dwellTimer: 0, dwelling: false, overspeedTimer: 0,
-      time: 0, horn: 0, statusMsg: `Abfahrt Richtung ${STATIONS[0].name}`,
+      time: 0, horn: 0, statusMsg: `Abfahrt ${ORIGIN.name} → ${STATIONS[0].name}`,
     });
     game.penalizedSignals = new Set();
+    // Debug-Startpunkt: URL-Hash #km=<n> setzt die Anfangsposition (nur zum Testen)
+    const dbg = /[#&]km=([\d.]+)/.exec(location.hash);
+    if (dbg) {
+      game.pos = parseFloat(dbg[1]) * 1000;
+      game.stationIdx = STATIONS.findIndex((s) => s.pos > game.pos);
+      if (game.stationIdx < 0) game.stationIdx = STATIONS.length;
+    }
     document.getElementById("overlay").classList.add("hidden");
     sound.ensure(); // AudioContext bei User-Geste freischalten
     updateHUD();
