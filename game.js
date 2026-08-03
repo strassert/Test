@@ -472,9 +472,10 @@
     const trainScreenX = W * 0.32;      // Zug bleibt links des Zentrums
 
     drawSky(groundY);
-    drawParallax(camPos, groundY);
+    drawParallax(camPos, groundY, trainScreenX);
     drawLandmarks(camPos, groundY, trainScreenX);
     drawGround(groundY);
+    drawForeground(camPos, groundY);
     drawTrack(camPos, groundY, trainScreenX);
     drawStations(camPos, groundY, trainScreenX);
     drawSignals(camPos, groundY, trainScreenX);
@@ -534,39 +535,51 @@
     return trainScreenX + (worldPos - camPos) / M_PER_PX;
   }
 
+  // Deterministischer Pseudo-Zufall (für ruhige, wiederholbare Platzierung)
+  function rnd(n) { const s = Math.sin(n * 127.1) * 43758.5453; return s - Math.floor(s); }
+
   function drawSky(groundY) {
     const g = ctx.createLinearGradient(0, 0, 0, groundY);
-    g.addColorStop(0, "#12305c");
-    g.addColorStop(0.6, "#4a86c9");
-    g.addColorStop(1, "#a9d4ef");
+    g.addColorStop(0, "#173a6b");
+    g.addColorStop(0.45, "#3f7fc4");
+    g.addColorStop(0.82, "#93c2e6");
+    g.addColorStop(1, "#d3e7f1");   // heller Dunst am Horizont
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, W, groundY);
 
-    // Sonne
-    ctx.fillStyle = "rgba(255,244,214,0.9)";
-    ctx.beginPath();
-    ctx.arc(W * 0.78, groundY * 0.32, 42, 0, Math.PI * 2);
-    ctx.fill();
+    // Sonne mit weichem Schein
+    const sunX = W * 0.8, sunY = groundY * 0.26;
+    const gl = ctx.createRadialGradient(sunX, sunY, 8, sunX, sunY, 130);
+    gl.addColorStop(0, "rgba(255,248,220,0.9)");
+    gl.addColorStop(1, "rgba(255,248,220,0)");
+    ctx.fillStyle = gl;
+    ctx.beginPath(); ctx.arc(sunX, sunY, 130, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#fff7db";
+    ctx.beginPath(); ctx.arc(sunX, sunY, 38, 0, Math.PI * 2); ctx.fill();
+
+    // Ein paar Vögel
+    ctx.strokeStyle = "rgba(40,60,80,0.45)"; ctx.lineWidth = 2; ctx.lineCap = "round";
+    for (const [bx, by, s] of [[W * 0.2, groundY * 0.2, 1], [W * 0.27, groundY * 0.27, 0.8], [W * 0.15, groundY * 0.31, 0.7]]) {
+      ctx.beginPath();
+      ctx.moveTo(bx - 8 * s, by); ctx.quadraticCurveTo(bx, by - 6 * s, bx, by);
+      ctx.quadraticCurveTo(bx, by - 6 * s, bx + 8 * s, by); ctx.stroke();
+    }
   }
 
-  function drawParallax(camPos, groundY) {
-    // Alpenkette am Horizont (Salzburger Land: Untersberg, Gaisberg …)
-    drawAlps(camPos * 0.07, groundY);
-    // Ferne Berge (langsam)
-    layerHills(camPos * 0.12, groundY, groundY - 140, "#3a5c7a", 520, 120, 0.15);
-    // Nähere Hügel (Voralpenland)
-    layerHills(camPos * 0.28, groundY, groundY - 66, "#3f7a5c", 360, 90, 0.6);
-    // Wolken
-    drawClouds(camPos * 0.06, groundY);
-    // Bäume nahe (schnell), separat in drawGround-Bereich
-    drawTrees(camPos * 0.85, groundY);
+  function drawParallax(camPos, groundY, trainScreenX) {
+    drawAlps(camPos * 0.05, groundY);                    // ferne Alpenkette
+    drawFarLandmarks(camPos, groundY, trainScreenX);     // Untersberg + Gaisberg
+    layerHills(camPos * 0.12, groundY, groundY - 96, "#7196ac", 560, 100, "rgba(160,190,210,0.5)"); // dunstige Ferne
+    layerHills(camPos * 0.22, groundY, groundY - 60, "#4f8a63", 380, 84, "rgba(150,200,150,0.35)"); // Mittelgrund
+    layerHills(camPos * 0.34, groundY, groundY - 30, "#3c7a4d", 300, 62, "rgba(150,210,150,0.4)");  // nah
+    drawClouds(camPos * 0.045, groundY);
   }
 
-  // Schneebedeckte Alpengipfel am Horizont
+  // Ferne, schneebedeckte Alpenkette mit Luftperspektive (Dunst)
   function drawAlps(offset, groundY) {
-    const baseY = groundY - 40;
-    const peakSpacing = 150;
-    const heights = [150, 205, 120, 178, 138, 225, 160, 110, 190];
+    const baseY = groundY - 24;
+    const peakSpacing = 165;
+    const heights = [150, 210, 120, 182, 138, 232, 162, 108, 196, 172];
     ctx.save();
     ctx.beginPath();
     ctx.moveTo(0, baseY);
@@ -574,161 +587,407 @@
     for (let x = -peakSpacing; x <= W + peakSpacing; x += peakSpacing) {
       const px = x - (offset % peakSpacing);
       const h = heights[(idx++) % heights.length];
-      ctx.lineTo(px, baseY - h);
-      ctx.lineTo(px + peakSpacing / 2, baseY);
+      ctx.lineTo(px + peakSpacing * 0.5, baseY - h);
+      ctx.lineTo(px + peakSpacing, baseY);
     }
     ctx.lineTo(W, baseY);
     ctx.closePath();
-    ctx.fillStyle = "#5f7793";
-    ctx.fill();
     ctx.clip();
-    // Schneekappen (heller oberer Bereich)
-    ctx.fillStyle = "rgba(240,246,252,0.92)";
+    // Grundfarbe mit vertikalem Dunst-Verlauf
+    const mg = ctx.createLinearGradient(0, baseY - 232, 0, baseY);
+    mg.addColorStop(0, "#7c93ad"); mg.addColorStop(1, "#a9bccf");
+    ctx.fillStyle = mg; ctx.fillRect(0, baseY - 240, W, 240);
+    // Schneekappen
+    ctx.fillStyle = "rgba(244,248,253,0.95)";
     idx = 0;
     for (let x = -peakSpacing; x <= W + peakSpacing; x += peakSpacing) {
-      const px = x - (offset % peakSpacing);
+      const px = x - (offset % peakSpacing) + peakSpacing * 0.5;
       const h = heights[(idx++) % heights.length];
       const peakY = baseY - h;
       ctx.beginPath();
       ctx.moveTo(px, peakY);
-      ctx.lineTo(px - h * 0.16, peakY + h * 0.28);
-      ctx.lineTo(px - h * 0.05, peakY + h * 0.20);
-      ctx.lineTo(px + h * 0.06, peakY + h * 0.30);
-      ctx.lineTo(px + h * 0.16, peakY + h * 0.24);
-      ctx.closePath();
-      ctx.fill();
+      ctx.lineTo(px - h * 0.17, peakY + h * 0.30);
+      ctx.lineTo(px - h * 0.05, peakY + h * 0.21);
+      ctx.lineTo(px + h * 0.07, peakY + h * 0.31);
+      ctx.lineTo(px + h * 0.17, peakY + h * 0.25);
+      ctx.closePath(); ctx.fill();
     }
     ctx.restore();
   }
 
-  function layerHills(offset, groundY, baseY, color, wavelength, amp, alpha) {
+  // Weltverankerte Berg-Landmarken: Untersberg (Massiv) & Gaisberg (Sendeturm)
+  function drawFarLandmarks(camPos, groundY, trainScreenX) {
+    const par = 0.13;
+    const sx = (wp) => trainScreenX + (wp - camPos) / M_PER_PX * par;
+    const uX = sx(14300);
+    if (uX > -520 && uX < W + 520) drawUntersberg(uX, groundY);
+    const gX = sx(12400);
+    if (gX > -240 && gX < W + 240) drawGaisberg(gX, groundY);
+  }
+
+  // Untersberg – breites, schneebedecktes Kalkmassiv
+  function drawUntersberg(cx, groundY) {
+    const base = groundY - 18;
+    const top = base - 216;
     ctx.save();
-    ctx.globalAlpha = 1;
+    ctx.beginPath();
+    ctx.moveTo(cx - 260, base);
+    ctx.lineTo(cx - 200, top + 40);
+    ctx.quadraticCurveTo(cx - 150, top + 6, cx - 70, top);
+    ctx.quadraticCurveTo(cx + 40, top - 4, cx + 130, top + 26);
+    ctx.lineTo(cx + 210, top + 78);
+    ctx.lineTo(cx + 300, base);
+    ctx.closePath();
+    ctx.clip();
+    const g = ctx.createLinearGradient(0, top - 10, 0, base);
+    g.addColorStop(0, "#8296ab"); g.addColorStop(0.5, "#8ea3b6"); g.addColorStop(1, "#b7c6d4");
+    ctx.fillStyle = g; ctx.fillRect(cx - 300, top - 10, 620, base - top + 20);
+    // Schneefelder oben
+    ctx.fillStyle = "rgba(246,250,254,0.95)";
+    ctx.beginPath();
+    ctx.moveTo(cx - 200, top + 40);
+    ctx.quadraticCurveTo(cx - 150, top + 6, cx - 70, top);
+    ctx.quadraticCurveTo(cx + 40, top - 4, cx + 130, top + 26);
+    ctx.lineTo(cx + 150, top + 52);
+    ctx.quadraticCurveTo(cx + 20, top + 40, cx - 90, top + 46);
+    ctx.quadraticCurveTo(cx - 150, top + 50, cx - 190, top + 74);
+    ctx.closePath(); ctx.fill();
+    // ein paar Felsschründe
+    ctx.strokeStyle = "rgba(80,95,112,0.5)"; ctx.lineWidth = 2;
+    for (let i = 0; i < 5; i++) {
+      const rx = cx - 150 + i * 70;
+      ctx.beginPath(); ctx.moveTo(rx, top + 70); ctx.lineTo(rx + 14, base - 20); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // Gaisberg – bewaldeter Hausberg mit Sendeturm
+  function drawGaisberg(cx, groundY) {
+    const base = groundY - 12;
+    const peak = base - 150;
+    // Hügel
+    const g = ctx.createLinearGradient(0, peak, 0, base);
+    g.addColorStop(0, "#3f6a52"); g.addColorStop(1, "#5c8468");
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(cx - 150, base);
+    ctx.quadraticCurveTo(cx - 70, peak + 8, cx, peak);
+    ctx.quadraticCurveTo(cx + 90, peak + 10, cx + 160, base);
+    ctx.closePath(); ctx.fill();
+    // Wald-Textur
+    ctx.fillStyle = "rgba(30,60,42,0.35)";
+    for (let i = 0; i < 10; i++) {
+      const tx = cx - 120 + i * 26, ty = base - 20 - rnd(i + 3) * 90;
+      ctx.beginPath(); ctx.arc(tx, ty, 8, 0, Math.PI * 2); ctx.fill();
+    }
+    // Sendeturm (Sender Gaisberg) auf dem Gipfel
+    const tx = cx, ty = peak;
+    ctx.strokeStyle = "#d8dde3"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(tx - 8, ty); ctx.lineTo(tx - 2, ty - 46);
+    ctx.moveTo(tx + 8, ty); ctx.lineTo(tx + 2, ty - 46);
+    ctx.moveTo(tx - 6, ty - 14); ctx.lineTo(tx + 6, ty - 14);
+    ctx.moveTo(tx - 4, ty - 30); ctx.lineTo(tx + 4, ty - 30); ctx.stroke();
+    ctx.fillStyle = "#c94b3a"; // rot-weiße Mastspitze
+    ctx.fillRect(tx - 2, ty - 66, 4, 22);
+    ctx.fillStyle = "#eef1f4";
+    ctx.fillRect(tx - 2, ty - 58, 4, 5);
+    ctx.fillRect(tx - 2, ty - 50, 4, 5);
+  }
+
+  function layerHills(offset, groundY, baseY, color, wavelength, amp, rimColor) {
+    ctx.save();
     ctx.fillStyle = color;
     ctx.beginPath();
     ctx.moveTo(0, groundY);
-    const step = 20;
-    for (let x = 0; x <= W; x += step) {
-      const wx = x + (offset % wavelength);
-      const y = baseY - Math.sin(wx / wavelength * Math.PI * 2) * amp * alpha
-                       - Math.sin(wx / (wavelength * 0.37)) * amp * 0.3;
-      ctx.lineTo(x, y);
-    }
+    const step = 16;
+    const yAt = (x) => baseY
+      - Math.sin((x + (offset % wavelength)) / wavelength * Math.PI * 2) * amp
+      - Math.sin((x + (offset % wavelength)) / (wavelength * 0.37)) * amp * 0.28;
+    ctx.lineTo(0, yAt(0));
+    for (let x = 0; x <= W; x += step) ctx.lineTo(x, yAt(x));
     ctx.lineTo(W, groundY);
     ctx.closePath();
     ctx.fill();
+    // sonnenbeschienener Kammrand
+    if (rimColor) {
+      ctx.strokeStyle = rimColor; ctx.lineWidth = 3;
+      ctx.beginPath();
+      for (let x = 0; x <= W; x += step) { const y = yAt(x); x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); }
+      ctx.stroke();
+    }
     ctx.restore();
   }
 
   function drawClouds(offset, groundY) {
-    ctx.fillStyle = "rgba(255,255,255,0.7)";
-    const spacing = 420;
+    const spacing = 380;
     for (let i = -1; i < W / spacing + 2; i++) {
       const base = i * spacing - (offset % spacing);
-      const y = groundY * (0.18 + (i % 3) * 0.09);
-      cloud(base, y, 34 + (i % 2) * 10);
+      const y = groundY * (0.14 + (rnd(i * 3.3) * 0.28));
+      cloud(base, y, 30 + rnd(i + 1) * 22);
     }
   }
   function cloud(x, y, r) {
+    ctx.fillStyle = "rgba(255,255,255,0.55)";
+    ctx.beginPath();
+    ctx.ellipse(x, y + r * 0.55, r * 1.7, r * 0.5, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,0.9)";
     ctx.beginPath();
     ctx.arc(x, y, r, 0, Math.PI * 2);
-    ctx.arc(x + r, y + 6, r * 0.8, 0, Math.PI * 2);
-    ctx.arc(x - r * 0.9, y + 8, r * 0.7, 0, Math.PI * 2);
-    ctx.arc(x + r * 0.4, y - r * 0.5, r * 0.7, 0, Math.PI * 2);
+    ctx.arc(x + r, y + 5, r * 0.8, 0, Math.PI * 2);
+    ctx.arc(x - r * 0.95, y + 7, r * 0.7, 0, Math.PI * 2);
+    ctx.arc(x + r * 0.4, y - r * 0.5, r * 0.72, 0, Math.PI * 2);
     ctx.fill();
   }
 
-  function drawTrees(offset, groundY) {
-    const spacing = 150;
-    for (let i = -1; i < W / spacing + 2; i++) {
-      const x = i * spacing - (offset % spacing);
-      const y = groundY - 4;
-      // Stamm
-      ctx.fillStyle = "#5b3a22";
-      ctx.fillRect(x - 3, y - 30, 6, 30);
-      // Krone
-      ctx.fillStyle = "#2f7d4f";
-      ctx.beginPath();
-      ctx.arc(x, y - 40, 18, 0, Math.PI * 2);
-      ctx.arc(x - 12, y - 30, 13, 0, Math.PI * 2);
-      ctx.arc(x + 12, y - 30, 13, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
-
-  // Streckenspezifische Landmarken: Wallersee (Start) & Festung Hohensalzburg (Ziel)
+  // Streckenspezifische Landmarken: Wallersee (Start) & Salzburg-Skyline (Ziel)
   function drawLandmarks(camPos, groundY, trainScreenX) {
     const par = 0.42;
     const sx = (wp) => trainScreenX + (wp - camPos) / M_PER_PX * par;
 
-    // --- Wallersee bei Seekirchen (rund um Streckenkilometer 0) ---
     const lakeX = sx(600);
-    if (lakeX > -360 && lakeX < W + 360) {
-      const ly = groundY - 3;
-      const lg = ctx.createLinearGradient(0, ly - 16, 0, ly + 6);
-      lg.addColorStop(0, "#6ea9c9"); lg.addColorStop(1, "#3f7fa6");
-      ctx.fillStyle = lg;
+    if (lakeX > -380 && lakeX < W + 380) drawWallersee(lakeX, groundY);
+
+    const salzX = sx(13600);
+    if (salzX > -320 && salzX < W + 320) drawSalzburg(salzX, groundY);
+  }
+
+  // Wallersee mit Schilfgürtel, Schwan und Segelboot
+  function drawWallersee(cx, groundY) {
+    const ly = groundY - 2;
+    ctx.save();
+    // Wasserfläche (mit Himmelsreflex)
+    ctx.beginPath(); ctx.ellipse(cx, ly, 320, 22, 0, 0, Math.PI * 2); ctx.clip();
+    const lg = ctx.createLinearGradient(0, ly - 22, 0, ly + 22);
+    lg.addColorStop(0, "#7fb6d6"); lg.addColorStop(0.5, "#4f92ba"); lg.addColorStop(1, "#3b7ea6");
+    ctx.fillStyle = lg; ctx.fillRect(cx - 320, ly - 22, 640, 44);
+    // Glitzer-Reflexe
+    ctx.fillStyle = "rgba(255,255,255,0.45)";
+    for (let i = -6; i <= 6; i++) ctx.fillRect(cx + i * 42 - 9, ly - 6 + (i % 2) * 6, 18, 1.6);
+    ctx.restore();
+
+    // Segelboot
+    const bx = cx + 90;
+    ctx.fillStyle = "#f4f7fa";
+    ctx.beginPath(); ctx.moveTo(bx, ly - 30); ctx.lineTo(bx, ly - 4); ctx.lineTo(bx + 18, ly - 8); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "#e05a4a";
+    ctx.beginPath(); ctx.moveTo(bx - 2, ly - 30); ctx.lineTo(bx - 18, ly - 8); ctx.lineTo(bx - 2, ly - 8); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "#3a4650"; ctx.fillRect(bx - 16, ly - 6, 34, 4);
+
+    // Schwan
+    const wx = cx - 120;
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath(); ctx.ellipse(wx, ly - 4, 14, 7, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 4; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(wx + 8, ly - 8); ctx.quadraticCurveTo(wx + 20, ly - 20, wx + 16, ly - 26); ctx.stroke();
+    ctx.fillStyle = "#f2a33a";
+    ctx.beginPath(); ctx.arc(wx + 16, ly - 27, 2.4, 0, Math.PI * 2); ctx.fill();
+
+    // Schilfgürtel vorne (Wenger Moor)
+    for (let i = -7; i <= 7; i++) {
+      const rx = cx + i * 40 + (rnd(i + 9) - 0.5) * 12;
+      const h = 12 + rnd(i + 2) * 10;
+      ctx.strokeStyle = "#5f8a45"; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(rx, ly + 6); ctx.lineTo(rx, ly + 6 - h); ctx.stroke();
+      ctx.fillStyle = "#8a6a3a"; // Rohrkolben
+      ctx.fillRect(rx - 1.5, ly + 6 - h, 3, 6);
+    }
+  }
+
+  // Salzburg-Skyline: Festungsberg + Festung, Dom mit Kuppel, Kirchtürme
+  function drawSalzburg(cx, groundY) {
+    const base = groundY - 2;
+
+    // Bewaldeter Stadtberg (Kapuzinerberg) links
+    ctx.fillStyle = "#3c5f45";
+    ctx.beginPath();
+    ctx.moveTo(cx - 250, base);
+    ctx.quadraticCurveTo(cx - 190, base - 96, cx - 120, base - 88);
+    ctx.lineTo(cx - 90, base); ctx.closePath(); ctx.fill();
+
+    // Häuserzeile der Altstadt (mit roten Dächern)
+    for (let i = 0; i < 9; i++) {
+      const hx = cx - 118 + i * 26, hw = 22, hh = 26 + rnd(i) * 14;
+      ctx.fillStyle = ["#e9e2d6", "#e6d8c4", "#efe7db"][i % 3];
+      ctx.fillRect(hx, base - hh, hw, hh);
+      ctx.fillStyle = "#b5533a";
       ctx.beginPath();
-      ctx.ellipse(lakeX, ly, 300, 20, 0, 0, Math.PI * 2);
-      ctx.fill();
-      // Glitzernde Reflexe
-      ctx.fillStyle = "rgba(255,255,255,0.4)";
-      for (let i = -4; i <= 4; i++) {
-        ctx.fillRect(lakeX + i * 44 - 8, ly - 4 + (i % 2) * 4, 16, 1.5);
-      }
-      // Schilfufer
-      ctx.strokeStyle = "#4c7a3e"; ctx.lineWidth = 2;
-      for (let i = -5; i <= 5; i++) {
-        const rx = lakeX + i * 52;
-        ctx.beginPath(); ctx.moveTo(rx, ly + 2); ctx.lineTo(rx, ly - 8); ctx.stroke();
-      }
+      ctx.moveTo(hx - 2, base - hh); ctx.lineTo(hx + hw / 2, base - hh - 8); ctx.lineTo(hx + hw + 2, base - hh);
+      ctx.closePath(); ctx.fill();
     }
 
-    // --- Festung Hohensalzburg auf dem Festungsberg (vor Salzburg Hbf) ---
-    const fX = sx(13600);
-    if (fX > -260 && fX < W + 260) {
-      const base = groundY - 2;
-      // Festungsberg
-      ctx.fillStyle = "#4a6b4a";
+    // Salzburger Dom (breit, mit grüner Kuppel + zwei Türmen)
+    const dx = cx - 8, dbY = base, dh = 46;
+    ctx.fillStyle = "#efe9dd"; ctx.fillRect(dx - 34, dbY - dh, 68, dh);
+    for (const s of [-34, 26]) { // zwei Fronttürme
+      ctx.fillStyle = "#efe9dd"; ctx.fillRect(dx + s, dbY - dh - 26, 8, 26);
+      ctx.fillStyle = "#2f8f6f"; // grüne Turmhaube
+      ctx.beginPath(); ctx.arc(dx + s + 4, dbY - dh - 26, 6, Math.PI, 0); ctx.fill();
+      ctx.fillRect(dx + s + 3, dbY - dh - 34, 2, 8);
+    }
+    // grüne Kuppel
+    ctx.fillStyle = "#38a07c";
+    ctx.beginPath(); ctx.arc(dx, dbY - dh - 2, 18, Math.PI, 0); ctx.fill();
+    ctx.fillStyle = "#2f8f6f"; ctx.fillRect(dx - 2, dbY - dh - 30, 4, 12);
+
+    // ein paar barocke Kirchtürme mit grünen Zwiebelhauben
+    for (const [tx, th] of [[cx - 150, 64], [cx + 70, 54], [cx + 110, 72]]) {
+      ctx.fillStyle = "#eae3d6"; ctx.fillRect(tx - 6, base - th, 12, th);
+      ctx.fillStyle = "#2f8f6f";
       ctx.beginPath();
-      ctx.moveTo(fX - 170, base);
-      ctx.quadraticCurveTo(fX - 60, base - 150, fX + 30, base - 158);
-      ctx.quadraticCurveTo(fX + 130, base - 150, fX + 180, base);
-      ctx.closePath();
-      ctx.fill();
-      // Baumbewuchs (dunkler)
-      ctx.fillStyle = "rgba(30,60,40,0.5)";
+      ctx.moveTo(tx - 8, base - th);
+      ctx.quadraticCurveTo(tx, base - th - 16, tx + 8, base - th);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = "#d9c24a"; // goldene Spitze
+      ctx.fillRect(tx - 1, base - th - 20, 2, 6);
+    }
+
+    // Festungsberg + Festung Hohensalzburg (rechts, hoch)
+    const fX = cx + 150;
+    ctx.fillStyle = "#4a6b4a";
+    ctx.beginPath();
+    ctx.moveTo(fX - 120, base);
+    ctx.quadraticCurveTo(fX - 40, base - 150, fX + 20, base - 156);
+    ctx.quadraticCurveTo(fX + 90, base - 150, fX + 140, base);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "rgba(28,58,38,0.5)";
+    ctx.beginPath();
+    ctx.moveTo(fX - 120, base);
+    ctx.quadraticCurveTo(fX - 60, base - 70, fX - 10, base - 84);
+    ctx.lineTo(fX - 10, base); ctx.closePath(); ctx.fill();
+    const cy = base - 156;
+    ctx.fillStyle = "#ece7dd"; ctx.fillRect(fX - 44, cy, 92, 34);
+    ctx.fillRect(fX - 54, cy + 12, 112, 22);
+    for (const [tx2, tw, th2] of [[-54, 18, 26], [-6, 16, 40], [40, 18, 30]]) {
+      ctx.fillStyle = "#f2efe6";
+      ctx.fillRect(fX + tx2, cy - th2 + 26, tw, th2);
+      ctx.fillStyle = "#b23a2f";
       ctx.beginPath();
-      ctx.moveTo(fX - 170, base);
-      ctx.quadraticCurveTo(fX - 90, base - 70, fX - 30, base - 90);
-      ctx.lineTo(fX - 30, base); ctx.closePath(); ctx.fill();
-      // Festung (Mauern + Türme)
-      const cy = base - 158;
-      ctx.fillStyle = "#e8e4da";
-      ctx.fillRect(fX - 58, cy, 116, 40);       // Hauptmauer
-      ctx.fillRect(fX - 70, cy + 14, 140, 26);  // untere Mauer
-      // Türme mit Zinnen
-      for (const [tx, tw, th] of [[-70, 22, 30], [-8, 20, 46], [50, 22, 34]]) {
-        ctx.fillStyle = "#f0ede5";
-        ctx.fillRect(fX + tx, cy - th + 30, tw, th);
-        ctx.fillStyle = "#b8342a"; // rote Dächer
-        ctx.beginPath();
-        ctx.moveTo(fX + tx - 2, cy - th + 30);
-        ctx.lineTo(fX + tx + tw / 2, cy - th + 18);
-        ctx.lineTo(fX + tx + tw + 2, cy - th + 30);
-        ctx.closePath(); ctx.fill();
-        ctx.fillStyle = "#6b7078"; // Fenster
-        ctx.fillRect(fX + tx + tw / 2 - 2, cy - th + 36, 4, 8);
-      }
+      ctx.moveTo(fX + tx2 - 2, cy - th2 + 26);
+      ctx.lineTo(fX + tx2 + tw / 2, cy - th2 + 15);
+      ctx.lineTo(fX + tx2 + tw + 2, cy - th2 + 26);
+      ctx.closePath(); ctx.fill();
     }
   }
 
   function drawGround(groundY) {
     const g = ctx.createLinearGradient(0, groundY, 0, H);
-    g.addColorStop(0, "#4f7d3f");
+    g.addColorStop(0, "#5b8a45");
+    g.addColorStop(0.5, "#437037");
     g.addColorStop(1, "#2f4d27");
     ctx.fillStyle = g;
     ctx.fillRect(0, groundY, W, H - groundY);
+  }
+
+  // Vordergrund: Felderstreifen, Mischwald, Wildblumen, Bauernhof, Kühe
+  function drawForeground(camPos, groundY) {
+    // Feld-/Wiesenstreifen direkt hinter dem Bahndamm (leichte Farbbänder)
+    const foff = (camPos * 0.5) % 120;
+    for (let i = -1; i < W / 60 + 2; i++) {
+      const x = i * 60 - foff;
+      ctx.fillStyle = (i % 2 === 0) ? "rgba(120,175,90,0.35)" : "rgba(90,140,70,0.30)";
+      ctx.beginPath();
+      ctx.moveTo(x, groundY); ctx.lineTo(x + 60, groundY);
+      ctx.lineTo(x + 74, groundY + 26); ctx.lineTo(x - 14, groundY + 26);
+      ctx.closePath(); ctx.fill();
+    }
+
+    // Wildblumen (bunte Heuwiese)
+    const boff = (camPos * 0.7) % 40;
+    const cols = ["#ffd23f", "#ff6b8a", "#ffffff", "#c084fc"];
+    for (let i = 0; i < 70; i++) {
+      const x = (i * 40 - boff * 4) % (W + 40);
+      const xx = x < 0 ? x + W + 40 : x;
+      const y = groundY + 8 + rnd(i) * (H - groundY - 12);
+      ctx.fillStyle = cols[(i * 7) % cols.length];
+      ctx.beginPath(); ctx.arc(xx, y, 2 + rnd(i + 5) * 1.4, 0, Math.PI * 2); ctx.fill();
+    }
+
+    // Objektreihe (Bäume, Büsche, Bauernhof, Heuballen, Kuh) mit schneller Parallaxe
+    const spacing = 150;
+    const off = (camPos * 0.85) % spacing;
+    const first = Math.floor(camPos * 0.85 / spacing) - 1;
+    for (let i = -1; i < W / spacing + 2; i++) {
+      const idx = first + i + 1;
+      const x = i * spacing - off + (rnd(idx) - 0.5) * 60;
+      const y = groundY + 2;
+      const kind = rnd(idx * 1.7);
+      if (kind < 0.42) drawBroadleaf(x, y, 0.8 + rnd(idx + 1) * 0.5);
+      else if (kind < 0.72) drawConifer(x, y, 0.8 + rnd(idx + 2) * 0.6);
+      else if (kind < 0.82) drawBush(x, y);
+      else if (kind < 0.9) drawHayBales(x, y);
+      else if (kind < 0.96) drawFarmhouse(x, y);
+      else drawCow(x, y);
+    }
+  }
+
+  function drawBroadleaf(x, y, s) {
+    ctx.fillStyle = "#5b3a22";
+    ctx.fillRect(x - 3 * s, y - 34 * s, 6 * s, 34 * s);
+    ctx.fillStyle = "#357c4c";
+    ctx.beginPath();
+    ctx.arc(x, y - 44 * s, 20 * s, 0, Math.PI * 2);
+    ctx.arc(x - 14 * s, y - 33 * s, 14 * s, 0, Math.PI * 2);
+    ctx.arc(x + 14 * s, y - 33 * s, 14 * s, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,0.10)";
+    ctx.beginPath(); ctx.arc(x - 6 * s, y - 50 * s, 9 * s, 0, Math.PI * 2); ctx.fill();
+  }
+
+  function drawConifer(x, y, s) {
+    ctx.fillStyle = "#6b4a2c";
+    ctx.fillRect(x - 2.5 * s, y - 14 * s, 5 * s, 14 * s);
+    ctx.fillStyle = "#276b3f";
+    for (let k = 0; k < 3; k++) {
+      const ty = y - 12 * s - k * 16 * s, wgt = (3 - k) * 8 * s + 6 * s;
+      ctx.beginPath();
+      ctx.moveTo(x - wgt, ty); ctx.lineTo(x, ty - 22 * s); ctx.lineTo(x + wgt, ty);
+      ctx.closePath(); ctx.fill();
+    }
+    ctx.fillStyle = "rgba(255,255,255,0.10)";
+    ctx.beginPath(); ctx.moveTo(x, y - 60 * s); ctx.lineTo(x + 4 * s, y - 50 * s); ctx.lineTo(x - 2 * s, y - 50 * s); ctx.closePath(); ctx.fill();
+  }
+
+  function drawBush(x, y) {
+    ctx.fillStyle = "#2f6b40";
+    ctx.beginPath();
+    ctx.arc(x - 9, y - 8, 10, 0, Math.PI * 2);
+    ctx.arc(x + 6, y - 10, 12, 0, Math.PI * 2);
+    ctx.arc(x + 16, y - 7, 9, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  function drawHayBales(x, y) {
+    for (const [ox, oy] of [[0, 0], [22, 0], [11, -16]]) {
+      ctx.fillStyle = "#d9b866";
+      ctx.beginPath(); ctx.ellipse(x + ox, y - 8 + oy, 12, 10, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = "#b8934a"; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.ellipse(x + ox, y - 8 + oy, 6, 10, 0, 0, Math.PI * 2); ctx.stroke();
+    }
+  }
+
+  function drawFarmhouse(x, y) {
+    // Bauernhaus (weiß, Satteldach) mit kleinem Kirchturm daneben (Dorf)
+    ctx.fillStyle = "#f2ede2"; ctx.fillRect(x - 26, y - 34, 52, 34);
+    ctx.fillStyle = "#9a4a34";
+    ctx.beginPath(); ctx.moveTo(x - 32, y - 34); ctx.lineTo(x, y - 54); ctx.lineTo(x + 32, y - 34); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "#7fa8cf"; ctx.fillRect(x - 18, y - 26, 12, 12); ctx.fillRect(x + 6, y - 26, 12, 12);
+    ctx.fillStyle = "#6b4a34"; ctx.fillRect(x - 6, y - 20, 12, 20);
+    // kleiner Dorf-Kirchturm
+    ctx.fillStyle = "#eee7d9"; ctx.fillRect(x + 34, y - 50, 12, 50);
+    ctx.fillStyle = "#2f8f6f";
+    ctx.beginPath();
+    ctx.moveTo(x + 32, y - 50); ctx.quadraticCurveTo(x + 40, y - 64, x + 48, y - 50); ctx.closePath(); ctx.fill();
+  }
+
+  function drawCow(x, y) {
+    ctx.fillStyle = "#f4f1ec"; // Körper
+    ctx.beginPath(); ctx.ellipse(x, y - 12, 16, 9, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#3a3330"; // Flecken
+    ctx.beginPath(); ctx.arc(x - 6, y - 13, 4, 0, Math.PI * 2); ctx.arc(x + 7, y - 10, 3, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#f4f1ec";
+    ctx.beginPath(); ctx.arc(x + 16, y - 15, 5, 0, Math.PI * 2); ctx.fill(); // Kopf
+    ctx.fillStyle = "#5b504a"; // Beine
+    ctx.fillRect(x - 10, y - 4, 3, 6); ctx.fillRect(x + 6, y - 4, 3, 6);
   }
 
   function drawTrack(camPos, groundY, trainScreenX) {

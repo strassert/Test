@@ -94,8 +94,12 @@ Abfahrt in **Seekirchen am Wallersee**, dann in dieser Reihenfolge halten
 4. **Salzburg Kasern**
 5. **Salzburg Hauptbahnhof** (Endstation)
 
-Passend zur Strecke: die **Alpenkette** am Horizont, der **Wallersee** bei
-Seekirchen und die **Festung Hohensalzburg** kurz vor Salzburg.
+Passend zur Strecke gezeichnet: die schneebedeckte **Alpenkette** am Horizont,
+der **Wallersee** bei Seekirchen mit **Schilfgürtel** (Wenger Moor), Schwan und
+Segelboot, die bunte **Flachgau-Wiesenlandschaft** mit Bauernhöfen, Heuballen
+und Kühen, der **Gaisberg** mit seinem **Sendeturm**, der mächtige **Untersberg**
+und zum Schluss die **Salzburger Altstadt** mit **Dom-Kuppel**, barocken
+**Kirchtürmen** und der **Festung Hohensalzburg**.
 
 ## Ziel & Punkte (Klassisch)
 
