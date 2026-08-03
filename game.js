@@ -21,13 +21,13 @@
   window.addEventListener("resize", resize);
 
   // ---------- Konstanten (Welt in Metern, Zeit in Sekunden) ----------
-  const M_PER_PX = 0.2;          // Weltmeter pro Bildschirmpixel (Zoom) – kleiner = mehr Speed-Gefühl
-  const MAX_THROTTLE_ACCEL = 3.0;  // m/s² bei vollem Schub
-  const SERVICE_BRAKE = 3.2;     // m/s² Betriebsbremse
-  const EMERGENCY_BRAKE = 5.5;   // m/s² Notbremse
+  const M_PER_PX = 0.15;         // Weltmeter pro Bildschirmpixel (Zoom) – kleiner = mehr Speed-Gefühl
+  const MAX_THROTTLE_ACCEL = 4.4;  // m/s² bei vollem Schub
+  const SERVICE_BRAKE = 4.6;     // m/s² Betriebsbremse
+  const EMERGENCY_BRAKE = 7.5;   // m/s² Notbremse
   const ROLLING_DRAG = 0.07;     // konstanter Rollwiderstand m/s²
-  const AIR_DRAG = 0.0003;       // Luftwiderstand ~ v²
-  const LEVER_RATE = 2.8;        // wie schnell sich Hebel bewegen (pro s)
+  const AIR_DRAG = 0.00025;      // Luftwiderstand ~ v²
+  const LEVER_RATE = 3.6;        // wie schnell sich Hebel bewegen (pro s)
   const KMH = 3.6;               // m/s -> km/h
 
   // ---------- Streckendefinition ----------
@@ -578,14 +578,16 @@
     // Gemeinsamer Schatten unter dem ganzen Zug
     ctx.fillStyle = "rgba(0,0,0,0.28)";
     ctx.beginPath();
-    ctx.ellipse(x - 30, bodyBottom + 8, 210, 9, 0, 0, Math.PI * 2);
+    ctx.ellipse(x - 180, bodyBottom + 8, 370, 9, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Angehängter Personenwagen (hinter der Lok, also links)
+    // Zwei angehängte Personenwagen (hinter der Lok, also links)
+    drawCar(x - 372, bodyBottom, spin);
     drawCar(x - 210, bodyBottom, spin);
-    // Kupplung
+    // Kupplungen
     ctx.fillStyle = "#1a1e24";
     ctx.fillRect(x - 118, bodyBottom - 16, 20, 6);
+    ctx.fillRect(x - 292, bodyBottom - 16, 12, 6);
 
     // Lokomotive (Front zeigt nach rechts)
     drawLoco(x, groundY, bodyBottom, spin);
@@ -668,6 +670,10 @@
     ctx.quadraticCurveTo(left, top, left + 8, top);
     ctx.closePath();
     ctx.fill();
+
+    // Glanzstreifen (Reflexion) auf der Flanke
+    ctx.fillStyle = "rgba(255,255,255,0.16)";
+    ctx.fillRect(left + 6, top + 14, len - 30, 4);
 
     // Dachband (dunkler)
     ctx.fillStyle = "rgba(0,0,0,0.22)";
