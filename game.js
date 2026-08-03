@@ -21,13 +21,13 @@
   window.addEventListener("resize", resize);
 
   // ---------- Konstanten (Welt in Metern, Zeit in Sekunden) ----------
-  const M_PER_PX = 0.9;          // Weltmeter pro Bildschirmpixel (Zoom)
-  const MAX_THROTTLE_ACCEL = 0.85; // m/s² bei vollem Schub
-  const SERVICE_BRAKE = 1.4;     // m/s² Betriebsbremse
-  const EMERGENCY_BRAKE = 2.6;   // m/s² Notbremse
-  const ROLLING_DRAG = 0.08;     // konstanter Rollwiderstand m/s²
-  const AIR_DRAG = 0.00035;      // Luftwiderstand ~ v²
-  const LEVER_RATE = 1.6;        // wie schnell sich Hebel bewegen (pro s)
+  const M_PER_PX = 0.2;          // Weltmeter pro Bildschirmpixel (Zoom) – kleiner = mehr Speed-Gefühl
+  const MAX_THROTTLE_ACCEL = 3.0;  // m/s² bei vollem Schub
+  const SERVICE_BRAKE = 3.2;     // m/s² Betriebsbremse
+  const EMERGENCY_BRAKE = 5.5;   // m/s² Notbremse
+  const ROLLING_DRAG = 0.07;     // konstanter Rollwiderstand m/s²
+  const AIR_DRAG = 0.0003;       // Luftwiderstand ~ v²
+  const LEVER_RATE = 2.8;        // wie schnell sich Hebel bewegen (pro s)
   const KMH = 3.6;               // m/s -> km/h
 
   // ---------- Streckendefinition ----------
@@ -329,6 +329,7 @@
     drawTrack(camPos, groundY, trainScreenX);
     drawStations(camPos, groundY, trainScreenX);
     drawSignals(camPos, groundY, trainScreenX);
+    drawCatenary(camPos, groundY, trainScreenX);
     drawTrain(trainScreenX, groundY);
 
     if (game.paused) drawPauseOverlay();
@@ -519,108 +520,304 @@
     }
   }
 
+  // Höhe der Oberleitung über dem Boden (px)
+  const WIRE_H = 118;
+
+  function drawCatenary(camPos, groundY, trainScreenX) {
+    const wireY = groundY - WIRE_H;
+    // Fahrdraht (durchgehend, mit leichtem Durchhang zwischen den Masten)
+    const span = 60; // Meter zwischen Masten
+    const startM = Math.floor((camPos - trainScreenX * M_PER_PX) / span) * span;
+    ctx.strokeStyle = "#20262e";
+    ctx.lineWidth = 1.5;
+    // Tragseil (oben) + Fahrdraht (unten) mit Durchhang
+    for (let m = startM; m < camPos + (W - trainScreenX) * M_PER_PX + span; m += span) {
+      const x1 = worldToScreen(m, camPos, trainScreenX);
+      const x2 = worldToScreen(m + span, camPos, trainScreenX);
+      const mid = (x1 + x2) / 2;
+      // Fahrdraht mit Durchhang
+      ctx.beginPath();
+      ctx.moveTo(x1, wireY);
+      ctx.quadraticCurveTo(mid, wireY + 6, x2, wireY);
+      ctx.stroke();
+      // Tragseil
+      ctx.beginPath();
+      ctx.moveTo(x1, wireY - 22);
+      ctx.quadraticCurveTo(mid, wireY - 30, x2, wireY - 22);
+      ctx.stroke();
+      // Hänger
+      ctx.beginPath();
+      ctx.moveTo(mid, wireY - 27); ctx.lineTo(mid, wireY + 3);
+      ctx.stroke();
+    }
+    // Masten
+    for (let m = startM; m < camPos + (W - trainScreenX) * M_PER_PX + span; m += span) {
+      const x = worldToScreen(m, camPos, trainScreenX);
+      ctx.fillStyle = "#3a4652";
+      ctx.fillRect(x - 3, wireY - 24, 6, groundY - (wireY - 24));
+      // Ausleger
+      ctx.fillRect(x - 3, wireY - 24, 34, 4);
+      ctx.strokeStyle = "#3a4652";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(x + 28, wireY - 20); ctx.lineTo(x + 28, wireY - 2);
+      ctx.stroke();
+    }
+  }
+
   function drawTrain(x, groundY) {
     const railY = groundY + 26;
-    const bodyBottom = railY - 2;
-    const len = 150, height = 74;
-    const left = x - len * 0.5;
-    const top = bodyBottom - height - 8; // über den Rädern
+    const bodyBottom = railY - 4;
+    const spin = -game.pos / (13 * M_PER_PX);
 
     ctx.save();
-
     // leichtes Wippen bei Geschwindigkeit
-    const bob = Math.sin(game.time * 8) * Math.min(game.vel * 0.05, 1.2);
+    const bob = Math.sin(game.time * 9) * Math.min(game.vel * 0.03, 0.9);
     ctx.translate(0, bob);
 
-    // Schatten
-    ctx.fillStyle = "rgba(0,0,0,0.25)";
+    // Gemeinsamer Schatten unter dem ganzen Zug
+    ctx.fillStyle = "rgba(0,0,0,0.28)";
     ctx.beginPath();
-    ctx.ellipse(x, bodyBottom + 4, len * 0.55, 8, 0, 0, Math.PI * 2);
+    ctx.ellipse(x - 30, bodyBottom + 8, 210, 9, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Wagenkasten
+    // Angehängter Personenwagen (hinter der Lok, also links)
+    drawCar(x - 210, bodyBottom, spin);
+    // Kupplung
+    ctx.fillStyle = "#1a1e24";
+    ctx.fillRect(x - 118, bodyBottom - 16, 20, 6);
+
+    // Lokomotive (Front zeigt nach rechts)
+    drawLoco(x, groundY, bodyBottom, spin);
+
+    ctx.restore();
+  }
+
+  // Drehgestell mit zwei Achsen
+  function drawBogie(cx, bottom, spin) {
+    const r = 11;
+    // Rahmen
+    ctx.fillStyle = "#20252c";
+    roundRect(cx - 34, bottom - 20, 68, 16, 4);
+    ctx.fill();
+    for (const dx of [-20, 20]) {
+      ctx.save();
+      ctx.translate(cx + dx, bottom);
+      // Reifen
+      ctx.fillStyle = "#15181d";
+      ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+      // Felge
+      ctx.fillStyle = "#4b535e";
+      ctx.beginPath(); ctx.arc(0, 0, r - 4, 0, Math.PI * 2); ctx.fill();
+      // Speichen (drehen sich)
+      ctx.rotate(spin);
+      ctx.strokeStyle = "#20252c"; ctx.lineWidth = 2;
+      for (let s = 0; s < 4; s++) {
+        ctx.beginPath(); ctx.moveTo(0, 0);
+        ctx.lineTo(Math.cos(s * Math.PI / 2) * (r - 4), Math.sin(s * Math.PI / 2) * (r - 4));
+        ctx.stroke();
+      }
+      // Nabe
+      ctx.fillStyle = "#cbd3dd";
+      ctx.beginPath(); ctx.arc(0, 0, 2.5, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  function drawLoco(cx, groundY, bodyBottom, spin) {
+    const len = 168, height = 66;
+    const left = cx - len * 0.42;
+    const top = bodyBottom - height;
+    const noseR = left + len;      // Front rechts
+    const wireY = groundY - WIRE_H;
+
+    // ---- Stromabnehmer (Pantograph) auf dem Dach, berührt Fahrdraht ----
+    const panX = left + len * 0.4;
+    const baseY = top - 2;
+    ctx.strokeStyle = "#2b333d"; ctx.lineWidth = 2.4; ctx.lineCap = "round";
+    // Sockelisolatoren
+    ctx.fillStyle = "#3a424c";
+    ctx.fillRect(panX - 20, baseY - 3, 6, 4);
+    ctx.fillRect(panX + 14, baseY - 3, 6, 4);
+    // Scherenarme
+    ctx.beginPath();
+    ctx.moveTo(panX - 17, baseY - 2); ctx.lineTo(panX + 4, wireY + 4);
+    ctx.moveTo(panX + 17, baseY - 2); ctx.lineTo(panX + 4, wireY + 4);
+    ctx.moveTo(panX + 4, wireY + 4); ctx.lineTo(panX - 14, wireY + 2);
+    ctx.stroke();
+    // Schleifleiste (Kontakt zum Draht)
+    ctx.strokeStyle = "#1a1e24"; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(panX - 22, wireY + 2); ctx.lineTo(panX + 12, wireY + 2); ctx.stroke();
+    ctx.lineWidth = 1;
+
+    // ---- Wagenkasten mit stromlinienförmiger Nase ----
     const g = ctx.createLinearGradient(0, top, 0, bodyBottom);
-    g.addColorStop(0, "#e23b3b");
+    g.addColorStop(0, "#ff5a4d");
+    g.addColorStop(0.45, "#e23b3b");
     g.addColorStop(1, "#a51f1f");
     ctx.fillStyle = g;
-    roundRect(left, top, len, height, 10);
-    ctx.fill();
-
-    // Nase (stromlinienförmig vorne rechts)
-    ctx.fillStyle = "#c62828";
     ctx.beginPath();
-    ctx.moveTo(left + len - 30, top);
-    ctx.quadraticCurveTo(left + len + 18, top + 10, left + len, top + height);
-    ctx.lineTo(left + len - 40, top + height);
+    ctx.moveTo(left + 8, top);
+    ctx.lineTo(noseR - 34, top);
+    // Dach->Nase Rundung
+    ctx.quadraticCurveTo(noseR + 4, top + 6, noseR + 6, top + height * 0.55);
+    ctx.quadraticCurveTo(noseR + 6, bodyBottom, noseR - 14, bodyBottom);
+    ctx.lineTo(left + 8, bodyBottom);
+    ctx.quadraticCurveTo(left, bodyBottom, left, bodyBottom - 8);
+    ctx.lineTo(left, top + 8);
+    ctx.quadraticCurveTo(left, top, left + 8, top);
     ctx.closePath();
     ctx.fill();
 
-    // Zierstreifen
-    ctx.fillStyle = "#ffd23f";
-    ctx.fillRect(left, top + height - 16, len, 5);
-
-    // Fenster Führerstand
-    ctx.fillStyle = "#bfe3ff";
-    roundRect(left + len - 58, top + 12, 34, 22, 5);
+    // Dachband (dunkler)
+    ctx.fillStyle = "rgba(0,0,0,0.22)";
+    ctx.beginPath();
+    ctx.moveTo(left + 8, top);
+    ctx.lineTo(noseR - 34, top);
+    ctx.quadraticCurveTo(noseR - 2, top + 4, noseR - 4, top + 12);
+    ctx.lineTo(left + 6, top + 12);
+    ctx.closePath();
     ctx.fill();
-    // Seitenfenster
-    ctx.fillStyle = "#9fd0f0";
+    // Dachtechnik (Lüfter/Kästen)
+    ctx.fillStyle = "#5a6470";
+    for (let i = 0; i < 3; i++) ctx.fillRect(left + 22 + i * 22, top + 2, 14, 5);
+
+    // Zierstreifen (Livery)
+    ctx.fillStyle = "#ffd23f";
+    ctx.fillRect(left + 2, top + height - 20, len - 20, 6);
+    ctx.fillStyle = "#1c2530";
+    ctx.fillRect(left + 2, top + height - 12, len - 18, 3);
+
+    // Frontscheibe (schräg)
+    ctx.fillStyle = "#0e2438";
+    ctx.beginPath();
+    ctx.moveTo(noseR - 30, top + 8);
+    ctx.lineTo(noseR - 6, top + 12);
+    ctx.lineTo(noseR - 4, top + 30);
+    ctx.lineTo(noseR - 34, top + 28);
+    ctx.closePath();
+    ctx.fill();
+    // Reflexion
+    ctx.fillStyle = "rgba(180,220,255,0.5)";
+    ctx.beginPath();
+    ctx.moveTo(noseR - 28, top + 10);
+    ctx.lineTo(noseR - 16, top + 12);
+    ctx.lineTo(noseR - 22, top + 26);
+    ctx.lineTo(noseR - 32, top + 25);
+    ctx.closePath();
+    ctx.fill();
+
+    // Seitenfenster mit Rahmen
     for (let i = 0; i < 3; i++) {
-      roundRect(left + 20 + i * 34, top + 14, 24, 18, 4);
-      ctx.fill();
+      const wx = left + 24 + i * 34;
+      ctx.fillStyle = "#0e2438";
+      roundRect(wx - 1, top + 15, 26, 20, 4); ctx.fill();
+      const wg = ctx.createLinearGradient(0, top + 15, 0, top + 35);
+      wg.addColorStop(0, "#bfe3ff"); wg.addColorStop(1, "#7fb4dc");
+      ctx.fillStyle = wg;
+      roundRect(wx + 1, top + 17, 22, 16, 3); ctx.fill();
+      ctx.fillStyle = "rgba(255,255,255,0.35)";
+      roundRect(wx + 2, top + 18, 8, 14, 2); ctx.fill();
     }
 
-    // Frontscheinwerfer
+    // Loknummer-Plakette
+    ctx.fillStyle = "rgba(0,0,0,0.35)";
+    roundRect(left + 6, top + height - 34, 30, 11, 3); ctx.fill();
+    ctx.fillStyle = "#e8eefc";
+    ctx.font = "bold 8px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("101 042", left + 21, top + height - 25);
+    ctx.textAlign = "left";
+
+    // Scheinwerfer + Lichtkegel
     ctx.fillStyle = "#fff7cc";
-    ctx.beginPath();
-    ctx.arc(left + len - 6, top + height - 24, 4, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.beginPath(); ctx.arc(noseR - 8, top + height - 26, 4, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(noseR - 8, top + height - 14, 3.5, 0, Math.PI * 2); ctx.fill();
     if (game.vel > 0.5) {
-      ctx.fillStyle = "rgba(255,247,204,0.18)";
+      const glow = Math.min(0.22, 0.08 + game.vel * 0.004);
+      ctx.fillStyle = `rgba(255,247,204,${glow})`;
       ctx.beginPath();
-      ctx.moveTo(left + len - 4, top + height - 28);
-      ctx.lineTo(left + len + 70, top + height - 44);
-      ctx.lineTo(left + len + 70, top + height - 8);
+      ctx.moveTo(noseR - 4, top + height - 28);
+      ctx.lineTo(noseR + 90, top + height - 48);
+      ctx.lineTo(noseR + 90, top + height - 2);
       ctx.closePath();
       ctx.fill();
     }
 
-    // Räder (drehen sich)
-    const wheelR = 12;
-    const wheelYs = [left + 30, left + len - 34];
-    const spin = -game.pos / (wheelR * M_PER_PX);
-    for (const wx of wheelYs) {
-      ctx.save();
-      ctx.translate(wx, bodyBottom + 2);
-      ctx.rotate(spin);
-      ctx.fillStyle = "#22262c";
-      ctx.beginPath(); ctx.arc(0, 0, wheelR, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = "#5b636e"; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.moveTo(-wheelR, 0); ctx.lineTo(wheelR, 0);
-      ctx.moveTo(0, -wheelR); ctx.lineTo(0, wheelR); ctx.stroke();
-      ctx.restore();
-    }
+    // Puffer/Bahnräumer vorne
+    ctx.fillStyle = "#2a3038";
+    ctx.beginPath();
+    ctx.moveTo(noseR - 12, bodyBottom);
+    ctx.lineTo(noseR + 4, bodyBottom);
+    ctx.lineTo(noseR - 6, bodyBottom + 10);
+    ctx.lineTo(noseR - 24, bodyBottom + 10);
+    ctx.closePath();
+    ctx.fill();
 
-    // Bremsfunken bei starker Bremsung
+    // Drehgestelle
+    drawBogie(left + 30, bodyBottom + 4, spin);
+    drawBogie(left + len - 44, bodyBottom + 4, spin);
+
+    // Bremsfunken
     if ((game.brake > 0.6 || game.emergency) && game.vel > 4) {
-      for (let i = 0; i < 4; i++) {
+      for (let i = 0; i < 5; i++) {
         ctx.fillStyle = `rgba(255,${180 + Math.random() * 60 | 0},80,${Math.random()})`;
-        const sx = left + 30 + Math.random() * 20;
-        ctx.fillRect(sx, bodyBottom + 6 + Math.random() * 6, 2, 2);
+        const sx = left + 24 + Math.random() * 40;
+        ctx.fillRect(sx, bodyBottom + 8 + Math.random() * 8, 2, 2);
       }
     }
-
     // Hupen-Dampf
     if (game.horn > 0) {
       ctx.fillStyle = `rgba(255,255,255,${game.horn})`;
       for (let i = 0; i < 5; i++) {
         ctx.beginPath();
-        ctx.arc(left + len + 10 + i * 12, top - 6 - i * 5, 4 + i, 0, Math.PI * 2);
+        ctx.arc(noseR + 8 + i * 12, top - 4 - i * 5, 4 + i, 0, Math.PI * 2);
         ctx.fill();
       }
     }
+  }
 
-    ctx.restore();
+  function drawCar(cx, bodyBottom, spin) {
+    const len = 150, height = 60;
+    const left = cx - len / 2;
+    const top = bodyBottom - height;
+
+    // Kasten mit gerundetem Dach
+    const g = ctx.createLinearGradient(0, top, 0, bodyBottom);
+    g.addColorStop(0, "#f0f3f7");
+    g.addColorStop(1, "#c3ccd6");
+    ctx.fillStyle = g;
+    roundRect(left, top, len, height, 12); ctx.fill();
+
+    // Dachband
+    ctx.fillStyle = "#9aa5b1";
+    roundRect(left + 2, top, len - 4, 12, 10); ctx.fill();
+
+    // Zierstreifen passend zur Lok
+    ctx.fillStyle = "#e23b3b";
+    ctx.fillRect(left + 4, top + height - 22, len - 8, 7);
+    ctx.fillStyle = "#ffd23f";
+    ctx.fillRect(left + 4, top + height - 14, len - 8, 3);
+
+    // Fensterreihe
+    for (let i = 0; i < 5; i++) {
+      const wx = left + 14 + i * 27;
+      ctx.fillStyle = "#0e2438";
+      roundRect(wx - 1, top + 15, 22, 20, 4); ctx.fill();
+      const wg = ctx.createLinearGradient(0, top + 15, 0, top + 35);
+      wg.addColorStop(0, "#cfeaff"); wg.addColorStop(1, "#8bbde0");
+      ctx.fillStyle = wg;
+      roundRect(wx + 1, top + 17, 18, 16, 3); ctx.fill();
+      ctx.fillStyle = "rgba(255,255,255,0.35)";
+      roundRect(wx + 2, top + 18, 6, 14, 2); ctx.fill();
+    }
+    // Tür
+    ctx.fillStyle = "#8a95a1";
+    ctx.fillRect(left + len - 16, top + 14, 10, height - 30);
+
+    // Drehgestelle
+    drawBogie(left + 30, bodyBottom + 4, spin);
+    drawBogie(left + len - 30, bodyBottom + 4, spin);
   }
 
   function drawPauseOverlay() {
