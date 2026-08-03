@@ -78,7 +78,18 @@
     time: 0,
     horn: 0,             // visueller Hupen-Timer
     statusMsg: "Bereit zur Abfahrt",
+    // Kindermodus
+    kidMode: false,
+    going: false,        // Kindermodus: fährt der Zug gerade?
+    celebrate: 0,        // Jubel-Timer (s)
+    arrivedName: "",     // zuletzt erreichter Bahnhof (für Jubel-Banner)
+    stars: 0,            // erreichte Bahnhöfe
+    confetti: [],
   };
+
+  // Kindermodus-Fahrwerte
+  const KID_CRUISE = 44;   // flotte, aber ruhige Reisegeschwindigkeit (m/s)
+  const KID_SLOW = 340;    // ab dieser Distanz (m) sanft zum Bahnhof abbremsen
 
   // ---------- Eingabe ----------
   const input = { throttleUp: false, brakeDown: false };
@@ -88,13 +99,23 @@
     ArrowDown: "brakeDown", KeyS: "brakeDown",
   };
 
+  function hornPress() { sound.horn(); game.horn = 0.6; }
+
   window.addEventListener("keydown", (e) => {
+    if (game.kidMode) {
+      // Kindermodus: nur Los / Stopp / Hupe (auch für mitspielende Eltern)
+      if (e.code === "Space" || e.code === "Enter" || e.code === "ArrowUp" || e.code === "KeyW") { kidGo(); e.preventDefault(); }
+      else if (e.code === "ArrowDown" || e.code === "KeyS") { kidStop(); e.preventDefault(); }
+      else if (e.code === "KeyH") { hornPress(); }
+      return;
+    }
     if (keyMap[e.code]) { input[keyMap[e.code]] = true; e.preventDefault(); }
     else if (e.code === "Space") { game.emergency = true; e.preventDefault(); }
-    else if (e.code === "KeyH") { sound.horn(); game.horn = 0.6; }
+    else if (e.code === "KeyH") { hornPress(); }
     else if (e.code === "KeyP") { togglePause(); }
   });
   window.addEventListener("keyup", (e) => {
+    if (game.kidMode) return;
     if (keyMap[e.code]) { input[keyMap[e.code]] = false; e.preventDefault(); }
     else if (e.code === "Space") { game.emergency = false; }
   });
@@ -154,7 +175,35 @@
       o.connect(g); g.connect(a.destination);
       o.start(t); o.stop(t + 0.42);
     }
-    return { horn, ding, ensure };
+    // Fröhliche Melodie beim Ankommen (Kindermodus)
+    function cheer() {
+      const a = ensure(); if (!a) return;
+      const t = a.currentTime;
+      [523, 659, 784, 1047].forEach((f, i) => {
+        const o = a.createOscillator(), g = a.createGain();
+        o.type = "triangle"; o.frequency.value = f;
+        const s = t + i * 0.12;
+        g.gain.setValueAtTime(0.0001, s);
+        g.gain.exponentialRampToValueAtTime(0.16, s + 0.03);
+        g.gain.exponentialRampToValueAtTime(0.0001, s + 0.28);
+        o.connect(g); g.connect(a.destination);
+        o.start(s); o.stop(s + 0.3);
+      });
+    }
+    // Sanfter Abfahrts-Ton (Kindermodus)
+    function toot() {
+      const a = ensure(); if (!a) return;
+      const t = a.currentTime;
+      const o = a.createOscillator(), g = a.createGain();
+      o.type = "sine"; o.frequency.setValueAtTime(330, t);
+      o.frequency.exponentialRampToValueAtTime(440, t + 0.18);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.1, t + 0.04);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.3);
+      o.connect(g); g.connect(a.destination);
+      o.start(t); o.stop(t + 0.32);
+    }
+    return { horn, ding, cheer, toot, ensure };
   })();
 
   // ---------- Physik-Update ----------
@@ -162,6 +211,9 @@
     if (!game.running || game.paused || game.finished) return;
     game.time += dt;
     if (game.horn > 0) game.horn = Math.max(0, game.horn - dt);
+    if (game.celebrate > 0) game.celebrate = Math.max(0, game.celebrate - dt);
+
+    if (game.kidMode) { updateKid(dt); return; }
 
     // Hebel bewegen sich sanft zum Ziel
     const tTarget = input.throttleUp ? 1 : 0;
@@ -317,7 +369,96 @@
       <button id="start-btn">Neue Fahrt</button>
     `;
     document.getElementById("overlay").classList.remove("hidden");
-    document.getElementById("start-btn").addEventListener("click", startGame);
+    document.getElementById("start-btn").addEventListener("click", () => startGame("classic"));
+  }
+
+  // ======================= KINDERMODUS =======================
+  function updateKid(dt) {
+    if (game.stationIdx < STATIONS.length) {
+      const st = STATIONS[game.stationIdx];
+      const dist = st.pos - game.pos;
+      if (game.going) {
+        // Wunschgeschwindigkeit: cruisen, nahe am Bahnhof sanft bis auf Kriechtempo
+        // (Wurzel-Kennlinie: bleibt länger zügig, bremst dann weich ein)
+        let desired = KID_CRUISE;
+        if (dist < KID_SLOW) desired = Math.max(3.5, KID_CRUISE * Math.sqrt(Math.max(0, dist / KID_SLOW)));
+        game.vel += (desired - game.vel) * Math.min(1, dt * 2);
+        game.pos += game.vel * dt;
+        // Am Bahnhof angekommen -> sanft andocken und jubeln
+        if (dist <= 5) {
+          game.pos = st.pos; game.vel = 0; game.going = false;
+          arriveKid(st);
+        }
+      } else {
+        // sanft ausrollen
+        game.vel += (0 - game.vel) * Math.min(1, dt * 2.2);
+        if (game.vel < 0.05) game.vel = 0;
+        game.pos += game.vel * dt;
+      }
+    } else {
+      game.vel += (0 - game.vel) * Math.min(1, dt * 2.2);
+      game.pos += game.vel * dt;
+    }
+    document.body.classList.toggle("ready", !game.going && game.celebrate <= 0 && game.stationIdx < STATIONS.length);
+    updateKidHUD();
+  }
+
+  function arriveKid(st) {
+    game.stars++;
+    game.arrivedName = st.name;
+    game.celebrate = 2.4;
+    spawnConfetti();
+    sound.cheer();
+    game.stationIdx++;
+    if (game.stationIdx >= STATIONS.length) {
+      // Endstation Salzburg erreicht -> großes Finale
+      setTimeout(showKidFinish, 1900);
+    }
+    updateKidHUD();
+  }
+
+  function kidGo() {
+    if (!game.running || game.finished) return;
+    if (game.stationIdx >= STATIONS.length) return;   // schon am Ziel
+    if (!game.going) { game.going = true; sound.toot(); }
+  }
+
+  function kidStop() {
+    if (!game.running || game.finished) return;
+    game.going = false;
+  }
+
+  function spawnConfetti() {
+    const cols = ["#ff5a8a", "#ffd23f", "#4ade80", "#57c8ff", "#c084fc", "#ff9a3f"];
+    for (let i = 0; i < 70; i++) {
+      game.confetti.push({
+        x: Math.random() * W,
+        y: -20 - Math.random() * 60,
+        vx: (Math.random() - 0.5) * 60,
+        vy: 60 + Math.random() * 120,
+        rot: Math.random() * Math.PI,
+        vrot: (Math.random() - 0.5) * 8,
+        size: 6 + Math.random() * 6,
+        col: cols[(Math.random() * cols.length) | 0],
+      });
+    }
+  }
+
+  function showKidFinish() {
+    const box = document.querySelector(".overlay-box");
+    box.innerHTML = `
+      <h1>🎉 Angekommen! 🎉</h1>
+      <p class="tagline" style="font-size:18px;">Der Zug ist in <b>Salzburg</b>!<br>
+        Alle Bahnhöfe geschafft: <span style="font-size:26px;">${"⭐".repeat(STATIONS.length)}</span></p>
+      <div class="mode-buttons">
+        <button id="start-kid" class="mode-btn kid">
+          <span class="emoji">🚂</span><span class="mt">Nochmal!</span>
+          <span class="ms">wieder losfahren</span>
+        </button>
+      </div>
+    `;
+    document.getElementById("overlay").classList.remove("hidden");
+    document.getElementById("start-kid").addEventListener("click", () => startGame("kid"));
   }
 
   // ========================================================================
@@ -340,7 +481,52 @@
     drawCatenary(camPos, groundY, trainScreenX);
     drawTrain(trainScreenX, groundY);
 
+    if (game.kidMode) {
+      stepConfetti(1 / 60);
+      drawConfetti();
+      if (game.celebrate > 0) drawCelebration();
+    }
+
     if (game.paused) drawPauseOverlay();
+  }
+
+  // Konfetti (Kindermodus)
+  function stepConfetti(dt) {
+    for (let i = game.confetti.length - 1; i >= 0; i--) {
+      const p = game.confetti[i];
+      p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 60 * dt;
+      p.rot += p.vrot * dt;
+      if (p.y > H + 20) game.confetti.splice(i, 1);
+    }
+  }
+  function drawConfetti() {
+    for (const p of game.confetti) {
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rot);
+      ctx.fillStyle = p.col;
+      ctx.fillRect(-p.size / 2, -p.size / 4, p.size, p.size / 2);
+      ctx.restore();
+    }
+  }
+  // Jubel-Banner beim Ankommen (Kindermodus)
+  function drawCelebration() {
+    const pop = Math.min(1, (2.4 - game.celebrate) * 6);   // kleiner „Pop" beim Erscheinen
+    const scale = 0.7 + 0.3 * pop;
+    ctx.save();
+    ctx.translate(W / 2, H * 0.26);
+    ctx.scale(scale, scale);
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.font = "bold 30px system-ui, sans-serif";
+    const txt = "🎉 " + game.arrivedName + "! 🎉";
+    const w = ctx.measureText(txt).width + 48;
+    ctx.fillStyle = "rgba(15,22,34,0.85)";
+    roundRect(-w / 2, -34, w, 52, 26); ctx.fill();
+    ctx.fillStyle = "#fff";
+    ctx.fillText(txt, 0, -8);
+    ctx.font = "26px system-ui, sans-serif";
+    ctx.fillText("⭐".repeat(Math.min(game.stars, STATIONS.length)), 0, 34);
+    ctx.restore();
   }
 
   // Weltposition (m) -> Bildschirm-X (px)
@@ -1080,6 +1266,21 @@
     return m >= 1000 ? (m / 1000).toFixed(2) + " km" : Math.round(m) + " m";
   }
 
+  // ---------- Kinder-HUD ----------
+  const kidEl = {
+    stars: document.getElementById("kid-stars"),
+    nextName: document.getElementById("kid-next-name"),
+  };
+  function updateKidHUD() {
+    const total = STATIONS.length;
+    kidEl.stars.textContent = "⭐".repeat(game.stars) + "☆".repeat(Math.max(0, total - game.stars));
+    if (game.stationIdx < STATIONS.length) {
+      kidEl.nextName.textContent = STATIONS[game.stationIdx].name;
+    } else {
+      kidEl.nextName.textContent = "Angekommen! 🎉";
+    }
+  }
+
   // ---------- Game-Loop ----------
   let lastT = 0;
   function loop(t) {
@@ -1091,14 +1292,21 @@
   }
 
   // ---------- Steuerung Start/Pause ----------
-  function startGame() {
+  function startGame(mode) {
+    const kid = mode === "kid";
     Object.assign(game, {
       running: true, paused: false, pos: 0, vel: 0, throttle: 0, brake: 0,
       emergency: false, limit: STATIONS[0].limit, score: 0, finished: false,
       stationIdx: 0, dwellTimer: 0, dwelling: false, overspeedTimer: 0,
-      time: 0, horn: 0, statusMsg: `Abfahrt ${ORIGIN.name} → ${STATIONS[0].name}`,
+      time: 0, horn: 0, kidMode: kid, going: false, celebrate: 0,
+      arrivedName: "", stars: 0, confetti: [],
+      statusMsg: kid ? "" : `Abfahrt ${ORIGIN.name} → ${STATIONS[0].name}`,
     });
     game.penalizedSignals = new Set();
+    // Im Kindermodus alle Signale freundlich auf Grün
+    if (kid) SIGNALS.forEach((s) => (s.state = "green"));
+    document.body.classList.toggle("kid", kid);
+    document.body.classList.remove("ready");
     // Debug-Startpunkt: URL-Hash #km=<n> setzt die Anfangsposition (nur zum Testen)
     const dbg = /[#&]km=([\d.]+)/.exec(location.hash);
     if (dbg) {
@@ -1108,7 +1316,7 @@
     }
     document.getElementById("overlay").classList.add("hidden");
     sound.ensure(); // AudioContext bei User-Geste freischalten
-    updateHUD();
+    if (kid) updateKidHUD(); else updateHUD();
   }
 
   function togglePause() {
@@ -1116,9 +1324,21 @@
     game.paused = !game.paused;
   }
 
-  document.getElementById("start-btn").addEventListener("click", startGame);
+  // Modus-Auswahl im Start-Overlay
+  document.getElementById("start-kid").addEventListener("click", () => startGame("kid"));
+  document.getElementById("start-classic").addEventListener("click", () => startGame("classic"));
+
+  // Große Kinder-Knöpfe (Pointer = Maus + Touch)
+  function bindKid(id, fn) {
+    const b = document.getElementById(id);
+    b.addEventListener("pointerdown", (e) => { e.preventDefault(); fn(); });
+  }
+  bindKid("kid-go", kidGo);
+  bindKid("kid-stop", kidStop);
+  bindKid("kid-horn", hornPress);
 
   // ---------- Init ----------
+  if (location.hash.includes("debug")) window.__ZUG = game;
   resize();
   updateHUD();
   requestAnimationFrame(loop);

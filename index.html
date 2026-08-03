@@ -54,28 +54,45 @@
       <span><kbd>P</kbd> Pause</span>
     </div>
 
+    <!-- Kindermodus: große Sternchen-Leiste oben -->
+    <div id="kid-hud" class="kid-only">
+      <div id="kid-stars">⭐</div>
+      <div id="kid-next">🚉 <span id="kid-next-name">—</span></div>
+    </div>
+
     <!-- Start / message overlay -->
     <div id="overlay">
       <div class="overlay-box">
         <h1>🚄 Zugsimulator</h1>
-        <p class="tagline">Steuere deinen Shinkansen „Hayabusa" auf der S‑Bahn‑Linie S2<br><b>Seekirchen am Wallersee → Salzburg Hauptbahnhof</b>.</p>
-        <ul class="rules">
-          <li>🎚️ Regle <b>Schub</b> und <b>Bremse</b> mit den Pfeiltasten oder <b>W/S</b>.</li>
-          <li>🛑 Halte <b>präzise am Bahnsteig</b> — je genauer, desto mehr Punkte.</li>
-          <li>🚦 Beachte <b>rote Signale</b> — durchfahren kostet Punkte!</li>
-          <li>⚡ Überschreite das <b>Tempolimit</b> nicht.</li>
-          <li>🎯 Fahre die ganze Strecke ab und sammle Punkte.</li>
-        </ul>
-        <button id="start-btn">Fahrt beginnen</button>
-        <p class="hint-small">Touch-Geräte: nutze die Tasten unten am Bildschirm.</p>
+        <p class="tagline">Fahre den Shinkansen „Hayabusa" von<br><b>Seekirchen am Wallersee → Salzburg Hauptbahnhof</b>.</p>
+        <p class="pick">Wer spielt?</p>
+        <div class="mode-buttons">
+          <button id="start-kid" class="mode-btn kid">
+            <span class="emoji">🧸</span>
+            <span class="mt">Für Kinder</span>
+            <span class="ms">ab 3 Jahren · ganz einfach</span>
+          </button>
+          <button id="start-classic" class="mode-btn classic">
+            <span class="emoji">🎮</span>
+            <span class="mt">Klassisch</span>
+            <span class="ms">mit Tempo, Signalen & Punkten</span>
+          </button>
+        </div>
       </div>
     </div>
 
-    <!-- Touch controls -->
+    <!-- Touch controls (klassisch) -->
     <div id="touch-controls">
       <button class="touch-btn" data-key="brake">▼ Bremse</button>
       <button class="touch-btn" data-key="horn">📢</button>
       <button class="touch-btn" data-key="throttle">▲ Schub</button>
+    </div>
+
+    <!-- Kindermodus: drei große Knöpfe -->
+    <div id="kid-controls" class="kid-only">
+      <button id="kid-stop" class="kid-btn stop"><span class="ke">✋</span><span class="kl">Stopp</span></button>
+      <button id="kid-horn" class="kid-btn horn"><span class="ke">📢</span><span class="kl">Tööö!</span></button>
+      <button id="kid-go" class="kid-btn go"><span class="ke">🚂</span><span class="kl">Los!</span></button>
     </div>
   </div>
 

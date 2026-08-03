@@ -211,3 +211,79 @@ kbd {
   #info-panel, #score-panel { display: none; }
   #hud { gap: 8px; padding: 8px; }
 }
+
+/* ---------- Modus-Auswahl im Overlay ---------- */
+.pick { font-size: 16px; color: var(--text); margin: 6px 0 14px; font-weight: 600; }
+.mode-buttons { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+.mode-btn {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  width: 180px; padding: 18px 14px;
+  border: 2px solid var(--panel-border); border-radius: 16px;
+  background: rgba(255,255,255,0.06); color: var(--text);
+  cursor: pointer; transition: transform 0.1s, background 0.15s, border-color 0.15s;
+}
+.mode-btn:hover { transform: translateY(-3px); }
+.mode-btn .emoji { font-size: 40px; line-height: 1; }
+.mode-btn .mt { font-size: 19px; font-weight: 800; }
+.mode-btn .ms { font-size: 12px; color: var(--muted); }
+.mode-btn.kid { border-color: #ffcf3f; background: rgba(255,207,63,0.12); }
+.mode-btn.kid:hover { background: rgba(255,207,63,0.22); }
+.mode-btn.classic:hover { background: rgba(87,200,255,0.16); border-color: var(--accent); }
+
+/* ---------- Kindermodus ---------- */
+.kid-only { display: none; }
+body.kid .kid-only { display: flex; }
+body.kid #hud,
+body.kid #controls-hint,
+body.kid #touch-controls { display: none !important; }
+
+/* Sternchen-Leiste oben */
+#kid-hud {
+  position: absolute; top: 0; left: 0; right: 0;
+  align-items: center; justify-content: space-between;
+  padding: 14px 20px; pointer-events: none; gap: 12px;
+}
+#kid-stars {
+  font-size: 40px; line-height: 1; letter-spacing: 2px;
+  filter: drop-shadow(0 3px 6px rgba(0,0,0,0.4));
+}
+#kid-next {
+  background: rgba(15,22,34,0.82); border: 2px solid rgba(255,255,255,0.18);
+  border-radius: 999px; padding: 8px 20px; font-size: 22px; font-weight: 800;
+  color: #fff; backdrop-filter: blur(6px);
+}
+
+/* Drei große Knöpfe unten */
+#kid-controls {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  gap: 16px; padding: 18px; justify-content: center; z-index: 15;
+}
+.kid-btn {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 2px; flex: 1; max-width: 260px; min-height: 108px;
+  border: none; border-radius: 26px; cursor: pointer; color: #fff;
+  box-shadow: 0 10px 26px rgba(0,0,0,0.35); transition: transform 0.08s, filter 0.1s;
+  -webkit-tap-highlight-color: transparent;
+}
+.kid-btn .ke { font-size: 46px; line-height: 1; }
+.kid-btn .kl { font-size: 24px; font-weight: 900; letter-spacing: 0.5px; }
+.kid-btn:active { transform: scale(0.94); filter: brightness(1.1); }
+.kid-btn.go { background: linear-gradient(180deg, #4ade80, #16a34a); }
+.kid-btn.stop { background: linear-gradient(180deg, #fb7185, #e11d48); }
+.kid-btn.horn { background: linear-gradient(180deg, #fbbf24, #f59e0b); color: #3a2500; max-width: 150px; }
+
+/* „Los" pulsiert, wenn der Zug wartet */
+body.kid.ready #kid-go { animation: kidpulse 1s ease-in-out infinite; }
+@keyframes kidpulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 10px 26px rgba(22,163,74,0.5); }
+  50% { transform: scale(1.06); box-shadow: 0 14px 34px rgba(22,163,74,0.8); }
+}
+
+@media (max-width: 560px) {
+  .kid-btn { min-height: 92px; border-radius: 20px; }
+  .kid-btn .ke { font-size: 38px; }
+  .kid-btn .kl { font-size: 19px; }
+  #kid-stars { font-size: 30px; }
+  #kid-next { font-size: 17px; padding: 6px 14px; }
+  .mode-btn { width: 150px; }
+}

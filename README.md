@@ -8,6 +8,18 @@ Du steuerst einen **Shinkansen E5 „Hayabusa"** auf der realen Strecke der
 **S‑Bahn Salzburg (Linie S2)** von **Seekirchen am Wallersee** nach
 **Salzburg Hauptbahnhof**.
 
+## Zwei Modi
+
+Beim Start wählt man **wer spielt**:
+
+- **🧸 Für Kinder (ab 3 Jahren)** — ganz ohne Lesen und ohne Verlieren. Drei
+  große Knöpfe: **🚂 Los** (der Zug fährt los und **hält von allein am nächsten
+  Bahnhof**), **✋ Stopp** und **📢 Tööö!** (Hupe). Für jeden erreichten Bahnhof
+  gibt es einen **Stern ⭐**, Konfetti und eine fröhliche Melodie. Kein Tempolimit,
+  keine Signale, keine Strafen.
+- **🎮 Klassisch** — das volle Spiel mit Schub/Bremse, Tempolimits, Signalen und
+  punktgenauem Halten (siehe unten).
+
 ## Spielen / Lokal starten
 
 Es ist eine rein statische Website — kein Build, kein Backend. Drei Wege:
@@ -85,14 +97,14 @@ Abfahrt in **Seekirchen am Wallersee**, dann in dieser Reihenfolge halten
 Passend zur Strecke: die **Alpenkette** am Horizont, der **Wallersee** bei
 Seekirchen und die **Festung Hohensalzburg** kurz vor Salzburg.
 
-## Ziel & Punkte
+## Ziel & Punkte (Klassisch)
 
 - 🎯 **Präziser Halt** am Bahnsteig → bis zu **+100 Punkte** (je genauer, desto mehr)
 - 🚦 **Rotes Signal überfahren** → **−50 Punkte**
 - ⚡ **Tempolimit überschreiten** → laufender Punktabzug
 - ❌ **Bahnhof verpassen** → **−30 Punkte**
 
-## Steuerung
+## Steuerung (Klassisch)
 
 | Taste | Funktion |
 |-------|----------|
@@ -103,6 +115,8 @@ Seekirchen und die **Festung Hohensalzburg** kurz vor Salzburg.
 | `P` | Pause |
 
 Auf Touch-Geräten erscheinen unten am Bildschirm Bedienknöpfe.
+Im **Kindermodus** gibt es stattdessen die drei großen Knöpfe **🚂 Los**,
+**✋ Stopp** und **📢 Tööö!** (Tastatur: `Leertaste`/`↑` = Los, `↓` = Stopp, `H` = Hupe).
 
 ## Spielmechanik
 
