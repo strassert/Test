@@ -1180,7 +1180,7 @@
   const CAR_L = 150;   // Länge des geraden Wagenkastens (px)
   const CAR_H = 58;    // Höhe des Wagenkastens
   const GAP = 12;      // Lücke (Übergang) zwischen benachbarten Wagen
-  const NOSE = 104;    // Länge des Bugs über den Kasten hinaus
+  const NOSE = 124;    // Länge des langen „Hayabusa"-Bugs über den Kasten hinaus
   const GREEN_H = 22;  // Höhe des grünen Dachbands
   const WHEEL_R = 9;   // Radradius
 
@@ -1384,35 +1384,50 @@
     drawBogie(right - 30, bodyBottom, railY, spin);
   }
 
-  // Triebkopf mit langem „Hayabusa"-Bug (Front nach rechts)
+  // Triebkopf mit ordentlich nachgebautem „Hayabusa"-Langbug (Front nach rechts)
   function drawLeadCar(cx, bodyBottom, railY, spin) {
     const left = cx - CAR_L / 2;
     const right = cx + CAR_L / 2;          // Übergang Kasten -> Bug
     const top = bodyBottom - CAR_H;
     const beltY = top + GREEN_H;
+    const H = bodyBottom - top;
     const tipX = right + NOSE;
-    const tipY = bodyBottom - 11;          // Bugspitze knapp über den Schienen
+    const tipY = bodyBottom - 6;           // tief liegende Bugspitze (Kupplungshöhe)
 
-    // ---- Dach in Schrägansicht (Kasten + verjüngter Bug) ----
+    // Bugrücken: lang hoch, dann weich fallend, gerundete Spitze (Pfadfortsetzung ab (right,top))
+    const noseTop = () => {
+      ctx.bezierCurveTo(right + NOSE * 0.50, top - 2, right + NOSE * 0.86, top + H * 0.30, tipX - 6, tipY - 8);
+      ctx.quadraticCurveTo(tipX + 3, tipY - 4, tipX, tipY + 2);
+    };
+    // Bugunterseite: leicht konkav zur Spitze (ab (tipX,tipY+2) zurück zu (right,bodyBottom))
+    const noseBottom = () => {
+      ctx.bezierCurveTo(tipX - NOSE * 0.16, tipY + 7, right + NOSE * 0.44, bodyBottom + 4, right, bodyBottom);
+    };
+    // Grün/Weiß-Grenze am Bug (Verlauf von (right,beltY) zur Spitze)
+    const noseBelt = () => {
+      ctx.bezierCurveTo(right + NOSE * 0.5, beltY + 3, tipX - NOSE * 0.28, tipY - 1, tipX - 8, tipY - 2);
+    };
+
+    // ---- Dach in Schrägansicht: Kasten + Bug-Dachstreifen entlang des Rückens ----
     drawRoof(left, right, top);
     {
-      const nd = 8; // Resttiefe an der Bugspitze
+      const nd = DEP * 0.6, ox = nd * DEP_X, oy = nd * DEP_Y;
       ctx.fillStyle = "#0f6246";
       ctx.beginPath();
       ctx.moveTo(right, top);
-      ctx.lineTo(tipX, tipY);
-      ctx.lineTo(tipX + nd * DEP_X, tipY + nd * DEP_Y);
-      ctx.lineTo(right + DEP * DEP_X, top + DEP * DEP_Y);
+      noseTop();
+      ctx.lineTo(tipX + ox, tipY + 2 + oy);
+      ctx.lineTo(right + ox, top + oy);
       ctx.closePath(); ctx.fill();
     }
 
-    // ---- Umriss: Kasten + langer, flach auslaufender Bug ----
+    // ---- Umriss: Kasten + Langbug ----
     const outline = () => {
       ctx.beginPath();
       ctx.moveTo(left + 10, top);
       ctx.lineTo(right, top);
-      ctx.bezierCurveTo(right + NOSE * 0.55, top + 2, tipX - 8, tipY - 22, tipX, tipY);
-      ctx.quadraticCurveTo(right + NOSE * 0.5, bodyBottom + 2, right, bodyBottom);
+      noseTop();
+      noseBottom();
       ctx.lineTo(left + 8, bodyBottom);
       ctx.quadraticCurveTo(left, bodyBottom, left, bodyBottom - 8);
       ctx.lineTo(left, top + 8);
@@ -1425,16 +1440,17 @@
     // Weiß (Basis)
     const wg = ctx.createLinearGradient(0, top, 0, bodyBottom);
     wg.addColorStop(0, SK_WHITE_TOP); wg.addColorStop(1, SK_WHITE_BOT);
-    ctx.fillStyle = wg; ctx.fillRect(left - 6, top - 6, tipX - left + 14, CAR_H + 14);
-    // Grün: Dach + über den gesamten Bugrücken bis zur Spitze
-    const gg = ctx.createLinearGradient(0, top, 0, beltY + 12);
+    ctx.fillStyle = wg; ctx.fillRect(left - 6, top - 6, tipX - left + 16, CAR_H + 16);
+    // Grün: Dach + Bugrücken bis kurz vor die Spitze; darunter Weiß
+    const gg = ctx.createLinearGradient(0, top, 0, beltY + 14);
     gg.addColorStop(0, SK_GREEN_TOP); gg.addColorStop(1, SK_GREEN_BOT);
     ctx.fillStyle = gg;
     ctx.beginPath();
     ctx.moveTo(left - 6, top - 6);
     ctx.lineTo(right, top);
-    ctx.bezierCurveTo(right + NOSE * 0.55, top + 2, tipX - 8, tipY - 22, tipX, tipY);
-    ctx.quadraticCurveTo(right + NOSE * 0.4, tipY - 3, right, beltY);
+    noseTop();
+    // an der Grün/Weiß-Grenze zurück zum Kasten
+    ctx.bezierCurveTo(tipX - NOSE * 0.28, tipY - 1, right + NOSE * 0.5, beltY + 3, right, beltY);
     ctx.lineTo(left - 6, beltY);
     ctx.closePath(); ctx.fill();
     // Pinke Signaturlinie entlang Gürtel und Bug
@@ -1442,52 +1458,56 @@
     ctx.beginPath();
     ctx.moveTo(left, beltY + 1.5);
     ctx.lineTo(right, beltY + 1.5);
-    ctx.quadraticCurveTo(right + NOSE * 0.42, tipY + 1, tipX - 9, tipY + 3);
+    noseBelt();
     ctx.stroke();
-    // Dachglanz
+    // Dachglanz Kasten
     ctx.fillStyle = "rgba(255,255,255,0.16)"; ctx.fillRect(left + 6, top + 3, CAR_L - 22, 3);
-    // Bug-Glanz (Sheen entlang des Bugrückens) für den lackierten Hochglanz-Look
-    ctx.strokeStyle = "rgba(255,255,255,0.20)"; ctx.lineWidth = 3; ctx.lineCap = "round";
+    // Bug-Sheen entlang des Rückens (Hochglanz)
+    ctx.strokeStyle = "rgba(255,255,255,0.22)"; ctx.lineWidth = 2.5; ctx.lineCap = "round";
     ctx.beginPath();
-    ctx.moveTo(right + 4, top + 6);
-    ctx.quadraticCurveTo(right + NOSE * 0.6, top + 2, tipX - 16, tipY - 13);
+    ctx.moveTo(right + 6, top + 5);
+    ctx.bezierCurveTo(right + NOSE * 0.5, top + 1, right + NOSE * 0.82, top + H * 0.28, tipX - 12, tipY - 10);
     ctx.stroke();
     ctx.restore();
 
-    // ---- Cockpit-Frontscheibe (schwarz, umlaufend) an der Bugwurzel ----
+    // ---- Cockpit-Frontscheibe (schwarz, umlaufend) ----
     ctx.fillStyle = SK_WIN;
     ctx.beginPath();
-    ctx.moveTo(right - 6, top + 8);
-    ctx.quadraticCurveTo(right + 28, top + 10, right + 42, beltY - 2);
-    ctx.lineTo(right + 20, beltY + 7);
-    ctx.lineTo(right - 6, top + 26);
+    ctx.moveTo(right - 2, top + 9);
+    ctx.bezierCurveTo(right + 22, top + 7, right + 42, top + 13, right + 56, top + 25); // obere Kante am Bugrücken
+    ctx.lineTo(right + 44, beltY + 2);                                                  // vorne unten
+    ctx.quadraticCurveTo(right + 16, beltY + 6, right - 2, top + 27);                   // hinten unten
     ctx.closePath(); ctx.fill();
-    ctx.fillStyle = "rgba(165,212,247,0.45)";
+    // Scheiben-Reflex
+    ctx.fillStyle = "rgba(170,214,248,0.4)";
     ctx.beginPath();
-    ctx.moveTo(right - 2, top + 12); ctx.lineTo(right + 16, top + 14);
-    ctx.lineTo(right + 5, beltY); ctx.closePath(); ctx.fill();
+    ctx.moveTo(right + 2, top + 12); ctx.lineTo(right + 22, top + 13);
+    ctx.lineTo(right + 8, beltY + 1); ctx.closePath(); ctx.fill();
 
     // ---- Seitenfenster ----
-    windowStrip(left + 12, right - 8, beltY + 5, 15);
+    windowStrip(left + 12, right - 6, beltY + 5, 15);
     drawDoors(left, right, beltY, bodyBottom);
 
-    // ---- Scheinwerfer (zwei) am Bug + Lichtkegel ----
-    const hlx = right + NOSE * 0.52, hly = tipY - 7;
-    ctx.fillStyle = "#f4faff";
-    ctx.beginPath(); ctx.ellipse(hlx, hly, 4.5, 3, -0.15, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(hlx + 11, hly + 4, 3.4, 2.3, -0.15, 0, Math.PI * 2); ctx.fill();
+    // ---- Schmale Scheinwerfer im weißen Bugbereich (E5-typisch, angeschrägt) ----
+    const hlx = right + NOSE * 0.56, hly = tipY - 13;
+    ctx.save();
+    ctx.translate(hlx, hly); ctx.rotate(-0.16);
+    ctx.fillStyle = "#0e1922"; roundRect(-11, -5, 24, 10, 4); ctx.fill();      // dunkle Fassung
+    ctx.fillStyle = "#eef7ff"; roundRect(-9, -3.5, 13, 7, 3); ctx.fill();      // Hauptleuchte
+    ctx.fillStyle = "#f7b733"; roundRect(4, -3, 7, 6, 2); ctx.fill();          // Blinker/Zusatz
+    ctx.restore();
     if (game.vel > 0.5) {
       const glow = Math.min(0.22, 0.06 + game.vel * 0.003);
       ctx.fillStyle = `rgba(240,248,255,${glow})`;
       ctx.beginPath();
-      ctx.moveTo(hlx + 4, hly - 4);
-      ctx.lineTo(tipX + 82, tipY - 30);
-      ctx.lineTo(tipX + 82, tipY + 14);
+      ctx.moveTo(hlx + 8, hly - 3);
+      ctx.lineTo(tipX + 90, tipY - 34);
+      ctx.lineTo(tipX + 90, tipY + 12);
       ctx.closePath(); ctx.fill();
     }
     // Kupplungsklappe an der Spitze
-    ctx.fillStyle = "rgba(0,0,0,0.16)";
-    ctx.beginPath(); ctx.ellipse(tipX - 5, tipY + 1, 4, 6, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "rgba(0,0,0,0.18)";
+    ctx.beginPath(); ctx.ellipse(tipX - 9, tipY - 2, 4, 5, -0.3, 0, Math.PI * 2); ctx.fill();
 
     // ---- Kennung ----
     ctx.textAlign = "left";
