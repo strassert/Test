@@ -1230,23 +1230,46 @@
     ctx.ellipse((noseTip + tailX) / 2, railY + 11, (noseTip - tailX) / 2 + 8, 7, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Wagenübergänge (Faltenbälge) in den Lücken – zuerst, damit Kästen sie überdecken
+    // EINE durchgehende Dachfläche über den ganzen Zug (inkl. Übergänge) – keine Lücken
+    const tailLeft = tailX;
+    const leadRight = leadC + CAR_L / 2;
+    drawTrainRoof(tailLeft + 2, leadRight, top);
+    // Pantograph auf dem Dach (über Wagen c1)
+    drawPantograph(c1 + DEP * 0.5 * DEP_X, top + DEP * 0.5 * DEP_Y, railY);
+
+    // Faltenbälge in den Lücken (Seitenebene) – Dach liegt schon darüber
     drawGangway(c2 + CAR_L / 2, c1 - CAR_L / 2, top, bodyBottom);
     drawGangway(c1 + CAR_L / 2, leadC - CAR_L / 2, top, bodyBottom);
 
-    // Wagen von hinten nach vorne (Triebkopf zuletzt = ganz vorn)
-    drawMidCar(c2, bodyBottom, railY, spin, false);
-    drawMidCar(c1, bodyBottom, railY, spin, true);   // dieser Wagen trägt den Pantograph
+    // Wagenkästen (Seitenflächen) von hinten nach vorne
+    drawMidCar(c2, bodyBottom, railY, spin);
+    drawMidCar(c1, bodyBottom, railY, spin);
     drawLeadCar(leadC, bodyBottom, railY, spin);
 
     ctx.restore();
   }
 
-  // Faltenbalg-Übergang zwischen zwei Wagen
+  // Durchgehende Dachfläche des ganzen Zuges (Schrägansicht)
+  function drawTrainRoof(x0, x1, top) {
+    const dx = DEP * DEP_X, dy = DEP * DEP_Y;
+    roofFace(x0, x1, top, DEP);
+    // weiche Schulterkante vorne (Dach/Seite fängt Licht)
+    ctx.strokeStyle = "rgba(255,255,255,0.30)"; ctx.lineWidth = 2; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(x0 + 2, top + 1); ctx.lineTo(x1 - 2, top + 1); ctx.stroke();
+    // dezente Regenrinne an der Dachhinterkante
+    ctx.strokeStyle = "rgba(255,255,255,0.10)"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x0 + dx, top + dy); ctx.lineTo(x1 + dx, top + dy); ctx.stroke();
+    // Klimakästen als kleine erhabene Kästchen (Oberseite + Front)
+    for (let vu = x0 + 30; vu < x1 - 22; vu += 40) {
+      const vd = DEP * 0.4, bx = vu + vd * DEP_X, by = top + vd * DEP_Y;
+      topFace(bx, bx + 18, by - 3, 8, "#c9d1d9");
+      ctx.fillStyle = "#93a0ab"; ctx.fillRect(bx, by - 3, 18, 3);
+    }
+  }
+
+  // Faltenbalg-Übergang zwischen zwei Wagen (Seitenebene; Dach liegt darüber)
   function drawGangway(xL, xR, top, bodyBottom) {
     const y0 = top + 12, y1 = bodyBottom - 3;
-    // Dachbrücke (Schrägfläche), damit die Wagendächer verbunden wirken
-    roofFace(xL - 2, xR + 2, top + 3, DEP);
     ctx.fillStyle = "#171b21";
     ctx.fillRect(xL - 3, y0, (xR - xL) + 6, y1 - y0);
     ctx.strokeStyle = "rgba(255,255,255,0.05)"; ctx.lineWidth = 1;
@@ -1363,34 +1386,11 @@
     ctx.closePath(); ctx.fill();
   }
 
-  // Dach-Oberfläche eines geraden Wagens (Schrägansicht)
-  function drawRoof(left, right, top) {
-    const x0 = left + 12, x1 = right - 12;
-    const dx = DEP * DEP_X, dy = DEP * DEP_Y;
-    roofFace(x0, x1, top, DEP);
-    // weiche Schulter (Dach/Seite fängt Licht) – vordere Kante
-    ctx.strokeStyle = "rgba(255,255,255,0.30)"; ctx.lineWidth = 2; ctx.lineCap = "round";
-    ctx.beginPath(); ctx.moveTo(x0 + 2, top + 1); ctx.lineTo(x1 - 2, top + 1); ctx.stroke();
-    // dezente Dachkante hinten (Regenrinne) statt harter schwarzer Linie
-    ctx.strokeStyle = "rgba(255,255,255,0.10)"; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(x0 + dx, top + dy); ctx.lineTo(x1 + dx, top + dy); ctx.stroke();
-    // Klimakästen als kleine erhabene Kästchen (Oberseite + Front)
-    for (let i = 0; i < 3; i++) {
-      const vu = x0 + 26 + i * 34, vd = DEP * 0.38;
-      const bx = vu + vd * DEP_X, by = top + vd * DEP_Y;
-      topFace(bx, bx + 20, by - 3, 9, "#c9d1d9");        // Oberseite (hell)
-      ctx.fillStyle = "#93a0ab"; ctx.fillRect(bx, by - 3, 20, 3);  // Front
-    }
-  }
-
-  // Mittelwagen im E5-Design
-  function drawMidCar(cx, bodyBottom, railY, spin, hasPanto) {
+  // Mittelwagen im E5-Design (Dach kommt durchgehend aus drawTrainRoof)
+  function drawMidCar(cx, bodyBottom, railY, spin) {
     const left = cx - CAR_L / 2, right = cx + CAR_L / 2;
     const top = bodyBottom - CAR_H;
     const beltY = top + GREEN_H;
-
-    drawRoof(left, right, top);
-    if (hasPanto) drawPantograph(cx + DEP * 0.5 * DEP_X, top + DEP * 0.5 * DEP_Y, railY);
 
     ctx.save();
     roundRect(left, top, CAR_L, CAR_H, 11); ctx.clip();
@@ -1428,10 +1428,9 @@
       ctx.bezierCurveTo(right + NOSE * 0.5, beltY + 3, tipX - NOSE * 0.28, tipY - 1, tipX - 8, tipY - 2);
     };
 
-    // ---- Dach in Schrägansicht: Kasten + Bug-Dachstreifen entlang des Rückens ----
-    drawRoof(left, right, top);
+    // ---- Bug-Dachstreifen entlang des Rückens (Kastendach kommt durchgehend aus drawTrainRoof) ----
     {
-      // Bug-Dachstreifen entlang des Rückens; Tiefe verjüngt sich zur Spitze auf 0
+      // Tiefe verjüngt sich zur Spitze auf 0
       const P0 = [right, top], P1 = [right + NOSE * 0.50, top - 2],
             P2 = [right + NOSE * 0.86, top + H * 0.30], P3 = [tipX - 6, tipY - 8];
       const B = (t) => {
