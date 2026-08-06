@@ -1267,9 +1267,9 @@
     }
   }
 
-  // Faltenbalg-Übergang zwischen zwei Wagen (Seitenebene; Dach liegt darüber)
+  // Faltenbalg-Übergang zwischen zwei Wagen (bis zur Dachlinie, keine Lücke)
   function drawGangway(xL, xR, top, bodyBottom) {
-    const y0 = top + 12, y1 = bodyBottom - 3;
+    const y0 = top + 2, y1 = bodyBottom - 3;
     ctx.fillStyle = "#171b21";
     ctx.fillRect(xL - 3, y0, (xR - xL) + 6, y1 - y0);
     ctx.strokeStyle = "rgba(255,255,255,0.05)"; ctx.lineWidth = 1;
@@ -1386,6 +1386,18 @@
     ctx.closePath(); ctx.fill();
   }
 
+  // Kastenkontur mit flacher Oberkante (bündig zum Dach) und gerundeter Unterkante
+  function bodyPath(left, top, w, h, rb) {
+    ctx.beginPath();
+    ctx.moveTo(left, top);
+    ctx.lineTo(left + w, top);
+    ctx.lineTo(left + w, top + h - rb);
+    ctx.arcTo(left + w, top + h, left + w - rb, top + h, rb);
+    ctx.lineTo(left + rb, top + h);
+    ctx.arcTo(left, top + h, left, top + h - rb, rb);
+    ctx.closePath();
+  }
+
   // Mittelwagen im E5-Design (Dach kommt durchgehend aus drawTrainRoof)
   function drawMidCar(cx, bodyBottom, railY, spin) {
     const left = cx - CAR_L / 2, right = cx + CAR_L / 2;
@@ -1393,7 +1405,7 @@
     const beltY = top + GREEN_H;
 
     ctx.save();
-    roundRect(left, top, CAR_L, CAR_H, 11); ctx.clip();
+    bodyPath(left, top, CAR_L, CAR_H, 8); ctx.clip();
     fillBodyLivery(left, right, top, beltY, bodyBottom);
     ctx.restore();
 
@@ -1453,17 +1465,16 @@
       ctx.closePath(); ctx.fill();
     }
 
-    // ---- Umriss: Kasten + Langbug ----
+    // ---- Umriss: Kasten (flache Oberkante, bündig zum Dach) + Langbug ----
     const outline = () => {
       ctx.beginPath();
-      ctx.moveTo(left + 10, top);
+      ctx.moveTo(left, top);
       ctx.lineTo(right, top);
       noseTop();
       noseBottom();
       ctx.lineTo(left + 8, bodyBottom);
       ctx.quadraticCurveTo(left, bodyBottom, left, bodyBottom - 8);
-      ctx.lineTo(left, top + 8);
-      ctx.quadraticCurveTo(left, top, left + 10, top);
+      ctx.lineTo(left, top);
       ctx.closePath();
     };
 
