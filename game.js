@@ -1424,27 +1424,27 @@
     const beltY = top + GREEN_H;
     const H = bodyBottom - top;
     const tipX = right + NOSE;
-    const tipY = bodyBottom - 6;           // tief liegende Bugspitze (Kupplungshöhe)
+    const tipY = top + 26;                 // Bugspitze auf Fenster-/Gürtellinien-Höhe (E5-typisch)
 
-    // Bugrücken: lang hoch, dann weich fallend, gerundete Spitze (Pfadfortsetzung ab (right,top))
+    // Grüner Bugrücken: (right,top) -> Spitze; lang hoch, dann weich fallend
     const noseTop = () => {
-      ctx.bezierCurveTo(right + NOSE * 0.50, top - 2, right + NOSE * 0.86, top + H * 0.30, tipX - 6, tipY - 8);
-      ctx.quadraticCurveTo(tipX + 3, tipY - 4, tipX, tipY + 2);
+      ctx.bezierCurveTo(right + NOSE * 0.52, top - 1, right + NOSE * 0.90, tipY - 12, tipX - 3, tipY - 3);
+      ctx.quadraticCurveTo(tipX + 2, tipY, tipX, tipY + 3);      // gerundete Spitze
     };
-    // Bugunterseite: leicht konkav zur Spitze (ab (tipX,tipY+2) zurück zu (right,bodyBottom))
+    // Weiße Unterseite: Spitze -> (right,bodyBottom); lange flache Kurve
     const noseBottom = () => {
-      ctx.bezierCurveTo(tipX - NOSE * 0.16, tipY + 7, right + NOSE * 0.44, bodyBottom + 4, right, bodyBottom);
+      ctx.bezierCurveTo(tipX - NOSE * 0.30, tipY + 8, right + NOSE * 0.42, bodyBottom + 2, right, bodyBottom);
     };
-    // Grün/Weiß-Grenze am Bug (Verlauf von (right,beltY) zur Spitze)
+    // Grün/Weiß-Grenze (pinke Linie): (right,beltY) -> Spitze, fast gerade
     const noseBelt = () => {
-      ctx.bezierCurveTo(right + NOSE * 0.5, beltY + 3, tipX - NOSE * 0.28, tipY - 1, tipX - 8, tipY - 2);
+      ctx.quadraticCurveTo(right + NOSE * 0.5, beltY + (tipY - beltY) * 0.5, tipX - 3, tipY);
     };
 
     // ---- Bug-Dachstreifen entlang des Rückens (Kastendach kommt durchgehend aus drawTrainRoof) ----
     {
       // Tiefe verjüngt sich zur Spitze auf 0
-      const P0 = [right, top], P1 = [right + NOSE * 0.50, top - 2],
-            P2 = [right + NOSE * 0.86, top + H * 0.30], P3 = [tipX - 6, tipY - 8];
+      const P0 = [right, top], P1 = [right + NOSE * 0.52, top - 1],
+            P2 = [right + NOSE * 0.90, tipY - 12], P3 = [tipX - 3, tipY - 3];
       const B = (t) => {
         const u = 1 - t;
         return [u * u * u * P0[0] + 3 * u * u * t * P1[0] + 3 * u * t * t * P2[0] + t * t * t * P3[0],
@@ -1492,11 +1492,11 @@
     ctx.moveTo(left - 6, top - 6);
     ctx.lineTo(right, top);
     noseTop();
-    // an der Grün/Weiß-Grenze zurück zum Kasten
-    ctx.bezierCurveTo(tipX - NOSE * 0.28, tipY - 1, right + NOSE * 0.5, beltY + 3, right, beltY);
+    // an der Grün/Weiß-Grenze (pink) zurück zum Kasten
+    ctx.quadraticCurveTo(right + NOSE * 0.5, beltY + (tipY - beltY) * 0.5, right, beltY);
     ctx.lineTo(left - 6, beltY);
     ctx.closePath(); ctx.fill();
-    // Pinke Signaturlinie entlang Gürtel und Bug
+    // Pinke Signaturlinie entlang Gürtel und Bug (fast gerade bis zur Spitze)
     ctx.strokeStyle = SK_PINK; ctx.lineWidth = 3; ctx.lineCap = "round";
     ctx.beginPath();
     ctx.moveTo(left, beltY + 1.5);
@@ -1509,7 +1509,7 @@
     ctx.strokeStyle = "rgba(255,255,255,0.22)"; ctx.lineWidth = 2.5; ctx.lineCap = "round";
     ctx.beginPath();
     ctx.moveTo(right + 6, top + 5);
-    ctx.bezierCurveTo(right + NOSE * 0.5, top + 1, right + NOSE * 0.82, top + H * 0.28, tipX - 12, tipY - 10);
+    ctx.bezierCurveTo(right + NOSE * 0.52, top + 1, right + NOSE * 0.86, tipY - 12, tipX - 10, tipY - 4);
     ctx.stroke();
     ctx.restore();
 
@@ -1531,10 +1531,10 @@
     windowStrip(left + 12, right - 6, beltY + 5, 15);
     drawDoors(left, right, beltY, bodyBottom);
 
-    // ---- Schmale Scheinwerfer im weißen Bugbereich (E5-typisch, angeschrägt) ----
-    const hlx = right + NOSE * 0.56, hly = tipY - 13;
+    // ---- Schmale Scheinwerfer im weißen Bugbereich (unter der pinken Linie) ----
+    const hlx = right + NOSE * 0.42, hly = tipY + (bodyBottom - tipY) * 0.38;
     ctx.save();
-    ctx.translate(hlx, hly); ctx.rotate(-0.16);
+    ctx.translate(hlx, hly); ctx.rotate(0.12);
     ctx.fillStyle = "#0e1922"; roundRect(-11, -5, 24, 10, 4); ctx.fill();      // dunkle Fassung
     ctx.fillStyle = "#eef7ff"; roundRect(-9, -3.5, 13, 7, 3); ctx.fill();      // Hauptleuchte
     ctx.fillStyle = "#f7b733"; roundRect(4, -3, 7, 6, 2); ctx.fill();          // Blinker/Zusatz
@@ -1543,14 +1543,14 @@
       const glow = Math.min(0.22, 0.06 + game.vel * 0.003);
       ctx.fillStyle = `rgba(240,248,255,${glow})`;
       ctx.beginPath();
-      ctx.moveTo(hlx + 8, hly - 3);
-      ctx.lineTo(tipX + 90, tipY - 34);
-      ctx.lineTo(tipX + 90, tipY + 12);
+      ctx.moveTo(hlx + 10, hly - 3);
+      ctx.lineTo(tipX + 90, tipY - 6);
+      ctx.lineTo(tipX + 90, tipY + 30);
       ctx.closePath(); ctx.fill();
     }
     // Kupplungsklappe an der Spitze
-    ctx.fillStyle = "rgba(0,0,0,0.18)";
-    ctx.beginPath(); ctx.ellipse(tipX - 9, tipY - 2, 4, 5, -0.3, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "rgba(0,0,0,0.16)";
+    ctx.beginPath(); ctx.ellipse(tipX - 8, tipY + 1, 4, 5, 0, 0, Math.PI * 2); ctx.fill();
 
     // ---- Kennung ----
     ctx.textAlign = "left";
