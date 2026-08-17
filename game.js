@@ -1185,7 +1185,7 @@
   const CAR_L = 150;   // Länge des geraden Wagenkastens (px)
   const CAR_H = 58;    // Höhe des Wagenkastens
   const GAP = 12;      // Lücke (Übergang) zwischen benachbarten Wagen
-  const NOSE = 124;    // Länge des langen „Hayabusa"-Bugs über den Kasten hinaus
+  const NOSE = 138;    // Länge des langen „Hayabusa"-Bugs über den Kasten hinaus
   const GREEN_H = 22;  // Höhe des grünen Dachbands
   const WHEEL_R = 9;   // Radradius
 
@@ -1424,27 +1424,33 @@
     const beltY = top + GREEN_H;
     const H = bodyBottom - top;
     const tipX = right + NOSE;
-    const tipY = top + 26;                 // Bugspitze auf Fenster-/Gürtellinien-Höhe (E5-typisch)
+    const yRidge = top + 34;   // Höhe, in der der grüne Rücken die Spitze erreicht (tief)
+    const yBelly = top + 46;   // Höhe, in der die weiße Unterseite die Spitze erreicht
+    const tipY = top + 40;     // Mitte der stumpfen Spitze (für Scheinwerfer/Effekte)
 
-    // Grüner Bugrücken: (right,top) -> Spitze; lang hoch, dann weich fallend
+    // Grüner Rücken: (right,top) -> Rücken-Spitze; lange flache Neigung
+    const noseRidge = () => {
+      ctx.bezierCurveTo(right + NOSE * 0.46, top + 3, right + NOSE * 0.86, top + 22, tipX - 3, yRidge);
+    };
+    // Rücken + gerundete stumpfe Spitze bis zum Unterseiten-Start
     const noseTop = () => {
-      ctx.bezierCurveTo(right + NOSE * 0.52, top - 1, right + NOSE * 0.90, tipY - 12, tipX - 3, tipY - 3);
-      ctx.quadraticCurveTo(tipX + 2, tipY, tipX, tipY + 3);      // gerundete Spitze
+      noseRidge();
+      ctx.quadraticCurveTo(tipX + 3, top + 40, tipX - 2, yBelly);
     };
     // Weiße Unterseite: Spitze -> (right,bodyBottom); lange flache Kurve
     const noseBottom = () => {
-      ctx.bezierCurveTo(tipX - NOSE * 0.30, tipY + 8, right + NOSE * 0.42, bodyBottom + 2, right, bodyBottom);
+      ctx.bezierCurveTo(tipX - NOSE * 0.20, top + 49, right + NOSE * 0.45, bodyBottom + 2, right, bodyBottom);
     };
-    // Grün/Weiß-Grenze (pinke Linie): (right,beltY) -> Spitze, fast gerade
+    // Grün/Weiß-Grenze (pinke Linie): (right,beltY) -> nahe Spitze, sanft fallend
     const noseBelt = () => {
-      ctx.quadraticCurveTo(right + NOSE * 0.5, beltY + (tipY - beltY) * 0.5, tipX - 3, tipY);
+      ctx.quadraticCurveTo(right + NOSE * 0.52, top + 31, tipX - 5, top + 37);
     };
 
     // ---- Bug-Dachstreifen entlang des Rückens (Kastendach kommt durchgehend aus drawTrainRoof) ----
     {
       // Tiefe verjüngt sich zur Spitze auf 0
-      const P0 = [right, top], P1 = [right + NOSE * 0.52, top - 1],
-            P2 = [right + NOSE * 0.90, tipY - 12], P3 = [tipX - 3, tipY - 3];
+      const P0 = [right, top], P1 = [right + NOSE * 0.46, top + 3],
+            P2 = [right + NOSE * 0.86, top + 22], P3 = [tipX - 3, yRidge];
       const B = (t) => {
         const u = 1 - t;
         return [u * u * u * P0[0] + 3 * u * u * t * P1[0] + 3 * u * t * t * P2[0] + t * t * t * P3[0],
@@ -1491,12 +1497,12 @@
     ctx.beginPath();
     ctx.moveTo(left - 6, top - 6);
     ctx.lineTo(right, top);
-    noseTop();
+    noseRidge();
     // an der Grün/Weiß-Grenze (pink) zurück zum Kasten
-    ctx.quadraticCurveTo(right + NOSE * 0.5, beltY + (tipY - beltY) * 0.5, right, beltY);
+    ctx.quadraticCurveTo(right + NOSE * 0.52, top + 31, right, beltY);
     ctx.lineTo(left - 6, beltY);
     ctx.closePath(); ctx.fill();
-    // Pinke Signaturlinie entlang Gürtel und Bug (fast gerade bis zur Spitze)
+    // Pinke Signaturlinie entlang Gürtel und Bug (sanft fallend bis nahe zur Spitze)
     ctx.strokeStyle = SK_PINK; ctx.lineWidth = 3; ctx.lineCap = "round";
     ctx.beginPath();
     ctx.moveTo(left, beltY + 1.5);
@@ -1508,24 +1514,24 @@
     // Bug-Sheen entlang des Rückens (Hochglanz)
     ctx.strokeStyle = "rgba(255,255,255,0.22)"; ctx.lineWidth = 2.5; ctx.lineCap = "round";
     ctx.beginPath();
-    ctx.moveTo(right + 6, top + 5);
-    ctx.bezierCurveTo(right + NOSE * 0.52, top + 1, right + NOSE * 0.86, tipY - 12, tipX - 10, tipY - 4);
+    ctx.moveTo(right + 6, top + 6);
+    ctx.bezierCurveTo(right + NOSE * 0.46, top + 8, right + NOSE * 0.82, top + 22, tipX - 12, yRidge - 2);
     ctx.stroke();
     ctx.restore();
 
-    // ---- Cockpit-Frontscheibe (schwarz, umlaufend) ----
+    // ---- Cockpit-Frontscheibe (schwarz, umlaufend, kompakt am Führerstand) ----
     ctx.fillStyle = SK_WIN;
     ctx.beginPath();
     ctx.moveTo(right - 2, top + 9);
-    ctx.bezierCurveTo(right + 22, top + 7, right + 42, top + 13, right + 56, top + 25); // obere Kante am Bugrücken
-    ctx.lineTo(right + 44, beltY + 2);                                                  // vorne unten
-    ctx.quadraticCurveTo(right + 16, beltY + 6, right - 2, top + 27);                   // hinten unten
+    ctx.bezierCurveTo(right + 16, top + 8, right + 32, top + 12, right + 44, top + 21); // obere Kante am Bugrücken
+    ctx.lineTo(right + 34, beltY + 2);                                                  // vorne unten
+    ctx.quadraticCurveTo(right + 14, beltY + 5, right - 2, top + 25);                   // hinten unten
     ctx.closePath(); ctx.fill();
     // Scheiben-Reflex
     ctx.fillStyle = "rgba(170,214,248,0.4)";
     ctx.beginPath();
-    ctx.moveTo(right + 2, top + 12); ctx.lineTo(right + 22, top + 13);
-    ctx.lineTo(right + 8, beltY + 1); ctx.closePath(); ctx.fill();
+    ctx.moveTo(right + 2, top + 12); ctx.lineTo(right + 18, top + 13);
+    ctx.lineTo(right + 6, beltY + 1); ctx.closePath(); ctx.fill();
 
     // ---- Seitenfenster ----
     windowStrip(left + 12, right - 6, beltY + 5, 15);
