@@ -1,0 +1,11 @@
+# Lokal / auf dem Proxmox-Host starten:
+#   docker compose up -d      → http://localhost:8080
+#   docker compose down       → stoppen
+services:
+  zugsimulator:
+    build: .
+    image: zugsimulator:latest
+    container_name: zugsimulator
+    ports:
+      - "8080:80"
+    restart: unless-stopped
